@@ -17,6 +17,9 @@
 <body>
     <div class="app-wrapper">
         <div class="top-controls">
+            <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme">
+                <i class="fa-solid fa-sun"></i>
+            </button>
             <button id="settings-btn" class="icon-btn" aria-label="Settings">
                 <i class="fa-solid fa-gear"></i>
             </button>
@@ -29,6 +32,9 @@
             <header>
                 <h1>Zen52</h1>
                 <p>52 minutes focus &middot; 17 minutes break</p>
+                <div id="streak-container" class="streak-container hidden" title="Current Focus Streak">
+                    <i class="fa-solid fa-fire"></i> <span id="streak-count">0</span> Day Streak
+                </div>
             </header>
 
             <main>
@@ -90,6 +96,25 @@
                         <h3>Weekly Focus</h3>
                         <div class="chart-container">
                             <canvas id="weekly-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Achievements -->
+                    <div class="feature-card badges-card">
+                        <h3>Achievements</h3>
+                        <div class="badges-grid">
+                            <div class="badge-item locked" id="badge-novice" title="Complete 1 Focus Session">
+                                <div class="badge-icon"><i class="fa-solid fa-seedling"></i></div>
+                                <span>Novice</span>
+                            </div>
+                            <div class="badge-item locked" id="badge-streak" title="Reach a 3-Day Streak">
+                                <div class="badge-icon"><i class="fa-solid fa-fire"></i></div>
+                                <span>Consistent</span>
+                            </div>
+                            <div class="badge-item locked" id="badge-master" title="Accumulate 10 Hours of Focus">
+                                <div class="badge-icon"><i class="fa-solid fa-brain"></i></div>
+                                <span>Zen Master</span>
+                            </div>
                         </div>
                     </div>
                 </div>
