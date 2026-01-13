@@ -136,7 +136,14 @@
 
                     <!-- Brain Dump -->
                     <div class="feature-card">
-                        <h3>Brain Dump</h3>
+                        <div class="card-header-row"
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="margin: 0;">Brain Dump</h3>
+                            <button id="clear-scratchpad-btn" class="icon-btn small" title="Clear notes"
+                                style="font-size: 0.8rem; color: var(--text-secondary);">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
                         <textarea id="scratchpad" class="scratchpad" placeholder="Clear your mind..."></textarea>
                     </div>
 

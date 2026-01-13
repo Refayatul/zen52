@@ -869,6 +869,17 @@ if (scratchpad) {
     });
 }
 
+// Clear Scratchpad Button
+const clearScratchpadBtn = document.getElementById('clear-scratchpad-btn');
+if (clearScratchpadBtn) {
+    clearScratchpadBtn.addEventListener('click', () => {
+        if (confirm('Clear all Brain Dump notes?')) {
+            scratchpad.value = '';
+            localStorage.setItem('zen52_scratchpad', '');
+        }
+    });
+}
+
 // --- Shortcuts Modal Logic ---
 if (shortcutsBtn) {
     shortcutsBtn.addEventListener('click', () => shortcutsModal.showModal());
