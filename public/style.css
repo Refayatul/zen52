@@ -657,22 +657,30 @@ body.zen-mode .timer:hover {
 
 @media (min-width: 769px) {
     .container {
-        max-width: 1000px;
+        max-width: 1200px;
     }
 
     .features-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, 1fr);
         gap: 20px;
-        align-items: stretch;
-        /* Stretch to make cards equal height */
+        align-items: start;
+        /* Natural alignment */
     }
 
     .feature-card {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        /* Force fill */
+        min-height: 200px;
+        /* Minimum height for consistency */
+    }
+
+    /* Make specific cards more balanced */
+    .chart-card,
+    .badges-card {
+        min-height: 280px;
+    }
+
+    .task-card {
+        min-height: 300px;
     }
 
     /* Timer specific styling for desktop balance */
