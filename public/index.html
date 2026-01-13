@@ -71,6 +71,17 @@
                     <button class="preset-chip" data-focus="90" data-break="15">
                         <i class="fa-solid fa-brain"></i> Deep Work <span class="preset-time">90/15</span>
                     </button>
+                    <button class="preset-chip custom-chip" id="custom-timer-btn">
+                        <i class="fa-solid fa-sliders"></i> Custom
+                    </button>
+                </div>
+
+                <!-- Custom Timer Quick Input (Hidden by default) -->
+                <div id="custom-timer-input" class="custom-timer-input hidden">
+                    <input type="number" id="quick-focus" placeholder="Focus (min)" min="1" max="180" value="52">
+                    <span>/</span>
+                    <input type="number" id="quick-break" placeholder="Break (min)" min="1" max="60" value="17">
+                    <button class="btn primary small" id="apply-custom-btn">Apply</button>
                 </div>
 
                 <div class="features-grid">
@@ -177,15 +188,16 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Session History -->
+                    <div class="feature-card history-card">
+                        <h2>Session History</h2>
+                        <ul id="history-list" class="history-list">
+                            <li class="loading-text">Loading history...</li>
+                        </ul>
+                    </div>
                 </div>
             </main>
-
-            <section class="history-section">
-                <h2>Session History</h2>
-                <ul id="history-list" class="history-list">
-                    <li class="loading-text">Loading history...</li>
-                </ul>
-            </section>
         </div>
 
         <!-- Settings Modal -->

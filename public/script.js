@@ -363,6 +363,48 @@ document.querySelectorAll('.preset-chip, .preset-btn').forEach(btn => {
     });
 });
 
+// Custom Timer Logic
+const customTimerBtn = document.getElementById('custom-timer-btn');
+const customTimerInput = document.getElementById('custom-timer-input');
+const quickFocusInput = document.getElementById('quick-focus');
+const quickBreakInput = document.getElementById('quick-break');
+const applyCustomBtn = document.getElementById('apply-custom-btn');
+
+if (customTimerBtn) {
+    customTimerBtn.addEventListener('click', () => {
+        customTimerInput.classList.toggle('hidden');
+        // Pre-fill with current values
+        quickFocusInput.value = Math.floor(focusDuration / 60);
+        quickBreakInput.value = Math.floor(breakDuration / 60);
+    });
+}
+
+if (applyCustomBtn) {
+    applyCustomBtn.addEventListener('click', () => {
+        const newFocus = parseInt(quickFocusInput.value);
+        const newBreak = parseInt(quickBreakInput.value);
+
+        if (newFocus > 0 && newBreak > 0) {
+            focusDuration = newFocus * 60;
+            breakDuration = newBreak * 60;
+
+            localStorage.setItem('zen52_focus_time', focusDuration);
+            localStorage.setItem('zen52_break_time', breakDuration);
+
+            if (!isRunning) {
+                if (isFocusMode) timeLeft = focusDuration;
+                else timeLeft = breakDuration;
+                updateDisplay();
+            }
+
+            // Hide input and mark custom as active
+            customTimerInput.classList.add('hidden');
+            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+            customTimerBtn.classList.add('active');
+        }
+    });
+}
+
 closeSettingsBtn.addEventListener('click', () => {
     settingsModal.close();
 });
