@@ -4,37 +4,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Base52 - Productive Work Cycles</title>
+    <title>Zen52 - Focus & Clarity</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <h1>Base52</h1>
-            <p>52 minutes focus &middot; 17 minutes break</p>
-        </header>
+    <div class="app-wrapper">
+        <button id="zen-toggle" class="zen-toggle" aria-label="Toggle Zen Mode">
+            <i class="fa-solid fa-expand"></i>
+        </button>
 
-        <main>
-            <div id="timer-display" class="timer">52:00</div>
-            <div class="status-indicator" id="status-text">Focus Mode</div>
+        <div class="container">
+            <header>
+                <h1>Zen52</h1>
+                <p>52 minutes focus &middot; 17 minutes break</p>
+            </header>
 
-            <div class="controls">
-                <button id="start-btn" class="btn primary">Start</button>
-                <button id="reset-btn" class="btn secondary">Reset</button>
-            </div>
-        </main>
+            <main>
+                <div id="timer-display" class="timer">52:00</div>
+                <div class="status-indicator" id="status-text">Focus Mode</div>
 
-        <section class="history-section">
-            <h2>Recent Sessions</h2>
-            <ul id="history-list" class="history-list">
-                <!-- History items will be populated here -->
-                <li class="loading-text">Loading history...</li>
-            </ul>
-        </section>
+                <div class="controls">
+                    <button id="start-btn" class="btn primary">Start Focus</button>
+                    <button id="reset-btn" class="btn secondary" aria-label="Reset Timer"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+
+                <div class="features-grid">
+                    <!-- Ambient Sounds -->
+                    <div class="feature-card sound-card">
+                        <h3>Ambience</h3>
+                        <div class="sound-controls">
+                            <button class="sound-btn" data-sound="rain" title="Rain">
+                                <i class="fa-solid fa-cloud-rain"></i>
+                            </button>
+                            <button class="sound-btn" data-sound="forest" title="Forest">
+                                <i class="fa-solid fa-tree"></i>
+                            </button>
+                            <button class="sound-btn" data-sound="waves" title="Waves">
+                                <i class="fa-solid fa-water"></i>
+                            </button>
+                        </div>
+                        <audio id="audio-rain" loop src="sounds/rain.mp3"></audio>
+                        <audio id="audio-forest" loop src="sounds/forest.mp3"></audio>
+                        <audio id="audio-waves" loop src="sounds/waves.mp3"></audio>
+                    </div>
+
+                    <!-- Task List -->
+                    <div class="feature-card task-card">
+                        <h3>Tasks</h3>
+                        <div class="task-input-group">
+                            <input type="text" id="task-input" placeholder="What are you working on?">
+                            <button id="add-task-btn"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <ul id="task-list" class="task-list">
+                            <!-- Tasks go here -->
+                        </ul>
+                    </div>
+                </div>
+            </main>
+
+            <section class="history-section">
+                <h2>Session History</h2>
+                <ul id="history-list" class="history-list">
+                    <li class="loading-text">Loading history...</li>
+                </ul>
+            </section>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
