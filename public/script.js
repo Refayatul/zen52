@@ -332,14 +332,17 @@ closeSettingsBtn.addEventListener('click', () => {
 saveSettingsBtn.addEventListener('click', () => {
     const newFocus = parseInt(focusInput.value);
     const newBreak = parseInt(breakInput.value);
+    const newGoal = parseFloat(goalInput.value);
 
-    if (newFocus > 0 && newBreak > 0) {
+    if (newFocus > 0 && newBreak > 0 && newGoal > 0) {
         focusDuration = newFocus * 60;
         breakDuration = newBreak * 60;
+        dailyGoalHours = newGoal;
 
         // Save to local storage
         localStorage.setItem('zen52_focus_time', focusDuration);
         localStorage.setItem('zen52_break_time', breakDuration);
+        localStorage.setItem('zen52_daily_goal', dailyGoalHours);
 
         // If timer is not running, update current display immediately if in relevant mode
         if (!isRunning) {
@@ -348,6 +351,7 @@ saveSettingsBtn.addEventListener('click', () => {
             updateDisplay();
         }
 
+        fetchHistory(); // Update goal UI if changed
         settingsModal.close();
     } else {
         alert("Please enter valid positive numbers.");
@@ -488,6 +492,8 @@ function fetchHistory() {
     } else {
         streakContainer.classList.add('hidden');
     }
+
+    updateDailyGoal(sessions);
 }
 
 // --- Data Backup & Restore ---
