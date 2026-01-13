@@ -1,11 +1,17 @@
-const FOCUS_TIME = 52 * 60;
-const BREAK_TIME = 17 * 60;
+// --- Constants & State ---
+const DEFAULT_FOCUS_TIME = 52 * 60;
+const DEFAULT_BREAK_TIME = 17 * 60;
 
-let timeLeft = FOCUS_TIME;
+// Load settings from local storage or default
+let focusDuration = parseInt(localStorage.getItem('zen52_focus_time')) || DEFAULT_FOCUS_TIME;
+let breakDuration = parseInt(localStorage.getItem('zen52_break_time')) || DEFAULT_BREAK_TIME;
+
+let timeLeft = focusDuration;
 let timerId = null;
 let isRunning = false;
 let isFocusMode = true;
 
+// DOM Elements
 const timerDisplay = document.getElementById('timer-display');
 const statusText = document.getElementById('status-text');
 const startBtn = document.getElementById('start-btn');
@@ -15,10 +21,20 @@ const historyList = document.getElementById('history-list');
 // Zen & Features Elements
 const zenToggle = document.getElementById('zen-toggle');
 const soundBtns = document.querySelectorAll('.sound-btn');
+const soundSliders = document.querySelectorAll('.volume-slider');
 const taskInput = document.getElementById('task-input');
 const addTaskBtn = document.getElementById('add-task-btn');
 const taskListUl = document.getElementById('task-list');
 
+// Settings Elements
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings');
+const saveSettingsBtn = document.getElementById('save-settings');
+const focusInput = document.getElementById('focus-duration');
+const breakInput = document.getElementById('break-duration');
+
+// --- Helper Functions ---
 function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -33,7 +49,7 @@ function updateDisplay() {
 
 function switchMode() {
     isFocusMode = !isFocusMode;
-    timeLeft = isFocusMode ? FOCUS_TIME : BREAK_TIME;
+    timeLeft = isFocusMode ? focusDuration : breakDuration;
 
     if (isFocusMode) {
         statusText.textContent = "Focus Mode";
@@ -41,7 +57,6 @@ function switchMode() {
     } else {
         statusText.textContent = "Break Mode";
         timerDisplay.classList.add('break-mode');
-        // Auto-play break sound? (Optional)
     }
 
     updateDisplay();
@@ -63,12 +78,23 @@ async function saveSession(duration, type) {
     }
 }
 
+function triggerNotification(title, body) {
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/favicon.ico' });
+    }
+}
+
 function startTimer() {
     if (isRunning) return;
 
+    // Request Notification permission on first start
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
     isRunning = true;
     startBtn.textContent = 'Pause';
-    startBtn.style.backgroundColor = '#6e7681'; // Dimmer color when pausing
+    startBtn.style.backgroundColor = '#6e7681';
 
     timerId = setInterval(() => {
         if (timeLeft > 0) {
@@ -78,15 +104,16 @@ function startTimer() {
             clearInterval(timerId);
             isRunning = false;
             startBtn.textContent = 'Start Focus';
-            startBtn.style.backgroundColor = ''; 
+            startBtn.style.backgroundColor = '';
 
             if (isFocusMode) {
-                saveSession(52, 'focus');
-                 // Play notification sound
-                 new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3').play().catch(()=>console.log('Audio blocked'));
+                saveSession(Math.floor(focusDuration / 60), 'focus');
+                // Play notification sound
+                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3').play().catch(() => console.log('Audio blocked'));
+                triggerNotification("Focus Complete", "Great job! Time for a break.");
             } else {
-                // Break ended
-                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-simple-notification-26.mp3').play().catch(()=>console.log('Audio blocked'));
+                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-simple-notification-26.mp3').play().catch(() => console.log('Audio blocked'));
+                triggerNotification("Break Over", "Time to focus again.");
             }
 
             switchMode();
@@ -104,12 +131,14 @@ function pauseTimer() {
 function resetTimer() {
     pauseTimer();
     isFocusMode = true;
-    timeLeft = FOCUS_TIME;
+    timeLeft = focusDuration;
     statusText.textContent = "Focus Mode";
     timerDisplay.classList.remove('break-mode');
     startBtn.textContent = 'Start Focus';
     updateDisplay();
 }
+
+// --- Event Listeners ---
 
 startBtn.addEventListener('click', () => {
     if (isRunning) {
@@ -132,36 +161,88 @@ zenToggle.addEventListener('click', () => {
     }
 });
 
-// --- Sound Logic ---
+// --- Settings Logic ---
+settingsBtn.addEventListener('click', () => {
+    // Pre-populate values
+    focusInput.value = Math.floor(focusDuration / 60);
+    breakInput.value = Math.floor(breakDuration / 60);
+    settingsModal.showModal();
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+    settingsModal.close();
+});
+
+saveSettingsBtn.addEventListener('click', () => {
+    const newFocus = parseInt(focusInput.value);
+    const newBreak = parseInt(breakInput.value);
+
+    if (newFocus > 0 && newBreak > 0) {
+        focusDuration = newFocus * 60;
+        breakDuration = newBreak * 60;
+
+        // Save to local storage
+        localStorage.setItem('zen52_focus_time', focusDuration);
+        localStorage.setItem('zen52_break_time', breakDuration);
+
+        // If timer is not running, update current display immediately if in relevant mode
+        if (!isRunning) {
+            if (isFocusMode) timeLeft = focusDuration;
+            else timeLeft = breakDuration;
+            updateDisplay();
+        }
+
+        settingsModal.close();
+    } else {
+        alert("Please enter valid positive numbers.");
+    }
+});
+
+// --- Sound Logic & Volume ---
 let currentSound = null;
 
+// Volume Sliders
+soundSliders.forEach(slider => {
+    slider.addEventListener('input', (e) => {
+        const soundType = e.target.dataset.sound;
+        const audio = document.getElementById(`audio-${soundType}`);
+        audio.volume = e.target.value;
+    });
+    // Set initial volume
+    const soundType = slider.dataset.sound;
+    const audio = document.getElementById(`audio-${soundType}`);
+    if (audio) audio.volume = slider.value;
+});
+
+// Play Buttons
 soundBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const soundType = btn.dataset.sound;
         const audio = document.getElementById(`audio-${soundType}`);
 
-        // If clicking active button, stop it
+        // Match volume to slider
+        const slider = document.querySelector(`.volume-slider[data-sound="${soundType}"]`);
+        if (slider) audio.volume = slider.value;
+
+        // Toggle Logic
         if (btn.classList.contains('active')) {
             audio.pause();
             audio.currentTime = 0;
             btn.classList.remove('active');
-            currentSound = null;
+
+            // If this was the only sound playing, clear currentSound (simple logic)
+            if (currentSound === audio) currentSound = null;
             return;
         }
 
-        // Stop current if any
-        if (currentSound) {
-            // Find the button associated with currentSound
-            const activeBtn = document.querySelector('.sound-btn.active');
-            if (activeBtn) activeBtn.classList.remove('active');
-            currentSound.pause();
-            currentSound.currentTime = 0;
-        }
+        // Allow multiple sounds? Why not (It's a "Mixer" feature). 
+        // Previously we stopped others. Now let's allow mixing since we added volume controls!
+        // but if user wants single focus, they can just click one.
 
-        // Play new
+        // Play
         audio.play().then(() => {
             btn.classList.add('active');
-            currentSound = audio;
+            currentSound = audio; // Track last played
         }).catch(e => {
             console.log("Audio file missing or blocked", e);
             alert(`Tip: Place a file named '${soundType}.mp3' in public/sounds/ to hear this!`);
@@ -188,7 +269,6 @@ function renderTasks() {
             <button class="task-delete"><i class="fa-solid fa-trash"></i></button>
         `;
 
-        // Event Listeners
         const checkbox = li.querySelector('.task-checkbox');
         checkbox.addEventListener('change', () => {
             tasks[index].completed = checkbox.checked;
@@ -219,6 +299,22 @@ taskInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addTask();
 });
 
+// --- Keyboard Shortcuts ---
+document.addEventListener('keydown', (e) => {
+    // Ignore shortcuts if typing in input
+    if (document.activeElement.tagName === 'INPUT') return;
+
+    if (e.code === 'Space') {
+        e.preventDefault(); // Prevent scrolling
+        if (isRunning) pauseTimer();
+        else startTimer();
+    }
+
+    if (e.key.toLowerCase() === 'r') {
+        resetTimer();
+    }
+});
+
 // History Logic
 async function fetchHistory() {
     try {
@@ -227,8 +323,7 @@ async function fetchHistory() {
         const sessions = await response.json();
         renderHistory(sessions);
     } catch (error) {
-        // console.error('Error fetching history:', error); 
-        // Silent fail or loading text
+        // Silent fail
     }
 }
 

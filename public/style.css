@@ -40,22 +40,35 @@ body {
     z-index: 10;
 }
 
-/* Zen Toggle */
-.zen-toggle {
+/* Top Controls */
+.top-controls {
     position: fixed;
     top: 20px;
     right: 20px;
+    z-index: 100;
+    display: flex;
+    gap: 12px;
+}
+
+.icon-btn {
     background: transparent;
     border: none;
     color: var(--text-secondary);
     font-size: 1.2rem;
     cursor: pointer;
-    z-index: 100;
     transition: color 0.3s;
+    padding: 8px;
+    border-radius: 50%;
 }
 
-.zen-toggle:hover {
+.icon-btn:hover {
     color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.zen-toggle {
+    position: static;
+    /* Override previous fixed positioning */
 }
 
 /* Header */
@@ -137,12 +150,18 @@ header p {
     background-color: var(--card-bg);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
-    padding: 12px 18px; /* Square-ish for icon */
+    padding: 12px 18px;
+    /* Square-ish for icon */
 }
 
 .btn.secondary:hover {
     border-color: #8b949e;
     background-color: #21262d;
+}
+
+.btn.full-width {
+    width: 100%;
+    justify-content: center;
 }
 
 /* Features Grid */
@@ -175,28 +194,36 @@ header p {
 /* Sound Controls */
 .sound-controls {
     display: flex;
-    justify-content: space-around;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sound-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .sound-btn {
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 1.2rem;
+    font-size: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .sound-btn:hover {
     color: var(--text-primary);
     border-color: var(--text-secondary);
-    background-color: rgba(255,255,255,0.05);
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .sound-btn.active {
@@ -204,6 +231,36 @@ header p {
     border-color: var(--accent-active);
     background-color: rgba(88, 166, 255, 0.1);
     box-shadow: 0 0 12px rgba(88, 166, 255, 0.2);
+}
+
+.volume-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.volume-slider:hover {
+    opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.volume-slider:hover::-webkit-slider-thumb {
+    background: var(--text-primary);
 }
 
 /* Task List */
@@ -215,7 +272,7 @@ header p {
 
 #task-input {
     flex: 1;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 10px 12px;
@@ -299,7 +356,7 @@ header p {
     transition: all 0.2s;
 }
 
-.task-checkbox:checked + .task-text {
+.task-checkbox:checked+.task-text {
     text-decoration: line-through;
     color: var(--text-secondary);
     opacity: 0.6;
@@ -351,16 +408,92 @@ header p {
     border-bottom: 1px solid rgba(48, 54, 61, 0.5);
 }
 
-/* Zen Mode Overlay */
-body.zen-mode .app-wrapper {
-    /* Focus mode styles */
+/* Settings Modal */
+.settings-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 0;
+    color: var(--text-primary);
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
 }
 
-body.zen-mode header, 
-body.zen-mode .controls, 
-body.zen-mode .features-grid, 
+.settings-modal::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    padding: 24px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+}
+
+.setting-group {
+    margin-bottom: 20px;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.setting-group input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.setting-group input:focus {
+    outline: none;
+    border-color: var(--accent-focus);
+}
+
+/* Zen Mode Overlay */
+body.zen-mode .top-controls .settings-btn {
+    display: none;
+    /* Hide settings in zen mode */
+}
+
+/* Zen Mode Overlay: hide most elements */
+body.zen-mode header,
+body.zen-mode .controls,
+body.zen-mode .features-grid,
 body.zen-mode .history-section,
-body.zen-mode .status-indicator {
+body.zen-mode .status-indicator,
+body.zen-mode #settings-btn {
+    /* Hide specific buttons */
     display: none !important;
 }
 
@@ -374,7 +507,8 @@ body.zen-mode .container {
 }
 
 body.zen-mode .timer {
-    font-size: 20vw; /* Massive timer */
+    font-size: 20vw;
+    /* Massive timer */
     margin: 0;
     opacity: 0.5;
 }
@@ -384,11 +518,23 @@ body.zen-mode .timer:hover {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @media (max-width: 600px) {
-    .timer { font-size: 5rem; }
-    .features-grid { grid-template-columns: 1fr; }
+    .timer {
+        font-size: 5rem;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
 }
