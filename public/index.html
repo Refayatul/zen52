@@ -54,6 +54,15 @@
                 <div id="timer-display" class="timer">52:00</div>
                 <div class="status-indicator" id="status-text">Focus Mode</div>
 
+                <!-- Pomodoro Cycle Indicator -->
+                <div class="cycle-indicator" id="cycle-indicator">
+                    <span class="cycle-dot active" data-session="1"></span>
+                    <span class="cycle-dot" data-session="2"></span>
+                    <span class="cycle-dot" data-session="3"></span>
+                    <span class="cycle-dot" data-session="4"></span>
+                    <span class="cycle-label" id="cycle-label">Session 1/4</span>
+                </div>
+
                 <div class="controls">
                     <button id="start-btn" class="btn primary">Start Focus</button>
                     <button id="reset-btn" class="btn secondary" aria-label="Reset Timer"><i
@@ -268,6 +277,44 @@
                     <span>Mute Sounds</span> <span class="key-badge">M</span>
                 </li>
             </ul>
+        </div>
+    </dialog>
+
+    <!-- Session Notes Modal (appears after focus session) -->
+    <dialog id="session-notes-modal" class="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎉 Focus Complete!</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">What did you accomplish?</p>
+            <textarea id="session-note-input" class="scratchpad" placeholder="I worked on..."
+                style="min-height: 100px; margin-bottom: 16px;"></textarea>
+            <div class="setting-group-row">
+                <button id="skip-note-btn" class="btn secondary">Skip</button>
+                <button id="save-note-btn" class="btn primary">Save Note</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Break Suggestions Modal -->
+    <dialog id="break-modal" class="settings-modal">
+        <div class="modal-content" style="text-align: center;">
+            <div class="modal-header" style="justify-content: center;">
+                <h2>🧘 Break Time!</h2>
+            </div>
+            <p id="break-suggestion" style="font-size: 1.2rem; margin: 20px 0; color: var(--text-primary);">
+                Stand up and stretch!
+            </p>
+            <div id="breathing-exercise" class="breathing-exercise hidden">
+                <div class="breath-circle" id="breath-circle"></div>
+                <p id="breath-instruction">Breathe in...</p>
+            </div>
+            <div class="setting-group-row" style="justify-content: center; gap: 12px;">
+                <button id="start-breathing-btn" class="btn secondary small">
+                    <i class="fa-solid fa-wind"></i> Breathing Exercise
+                </button>
+                <button id="close-break-btn" class="btn primary small">Got it!</button>
+            </div>
         </div>
     </dialog>
 

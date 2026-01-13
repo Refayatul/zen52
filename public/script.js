@@ -12,6 +12,25 @@ let timerId = null;
 let isRunning = false;
 let isFocusMode = true;
 
+// Pomodoro Cycle State
+let currentSession = parseInt(localStorage.getItem('zen52_current_session')) || 1;
+const SESSIONS_BEFORE_LONG_BREAK = 4;
+const LONG_BREAK_DURATION = 25 * 60; // 25 minutes
+
+// Break Suggestions
+const breakSuggestions = [
+    "🧘 Stand up and stretch for 2 minutes",
+    "💧 Drink a glass of water",
+    "👀 Look at something 20 feet away for 20 seconds (20-20-20 rule)",
+    "🚶 Take a short walk around the room",
+    "🌬️ Take 5 deep breaths",
+    "🙆 Roll your shoulders and neck",
+    "🪟 Look outside a window for a minute",
+    "✋ Stretch your wrists and fingers",
+    "🧍 Do 10 jumping jacks",
+    "☕ Make yourself a hot drink"
+];
+
 // DOM Elements
 const timerDisplay = document.getElementById('timer-display');
 const statusText = document.getElementById('status-text');
@@ -250,6 +269,10 @@ function startTimer() {
                 // Play notification sound
                 new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3').play().catch(() => console.log('Audio blocked'));
                 triggerNotification("Focus Complete", "Great job! Time for a break.");
+
+                // Show Session Notes Modal
+                const sessionNotesModal = document.getElementById('session-notes-modal');
+                if (sessionNotesModal) sessionNotesModal.showModal();
             } else {
                 new Audio('https://assets.mixkit.co/sfx/preview/mixkit-simple-notification-26.mp3').play().catch(() => console.log('Audio blocked'));
                 triggerNotification("Break Over", "Time to focus again.");
@@ -277,6 +300,24 @@ function resetTimer() {
     updateDisplay();
 }
 
+function updateCycleIndicator() {
+    const dots = document.querySelectorAll('.cycle-dot');
+    const label = document.getElementById('cycle-label');
+
+    dots.forEach((dot, index) => {
+        dot.classList.remove('active', 'completed');
+        if (index < currentSession - 1) {
+            dot.classList.add('completed');
+        } else if (index === currentSession - 1) {
+            dot.classList.add('active');
+        }
+    });
+
+    if (label) {
+        const displaySession = Math.min(currentSession, 4);
+        label.textContent = `Session ${displaySession}/4`;
+    }
+}
 // --- Event Listeners ---
 
 startBtn.addEventListener('click', () => {
@@ -889,6 +930,96 @@ if (shortcutsBtn) {
         if (e.target === shortcutsModal) shortcutsModal.close();
     });
 }
+
+// --- Session Notes Modal Logic ---
+const sessionNotesModal = document.getElementById('session-notes-modal');
+const sessionNoteInput = document.getElementById('session-note-input');
+const saveNoteBtn = document.getElementById('save-note-btn');
+const skipNoteBtn = document.getElementById('skip-note-btn');
+
+if (saveNoteBtn) {
+    saveNoteBtn.addEventListener('click', () => {
+        const note = sessionNoteInput.value.trim();
+        if (note) {
+            // Save note to localStorage with timestamp
+            const sessionNotes = JSON.parse(localStorage.getItem('zen52_session_notes') || '[]');
+            sessionNotes.unshift({
+                note: note,
+                timestamp: new Date().toISOString(),
+                duration: Math.floor(focusDuration / 60)
+            });
+            // Keep only last 50 notes
+            localStorage.setItem('zen52_session_notes', JSON.stringify(sessionNotes.slice(0, 50)));
+        }
+        sessionNoteInput.value = '';
+        sessionNotesModal.close();
+    });
+}
+
+if (skipNoteBtn) {
+    skipNoteBtn.addEventListener('click', () => {
+        sessionNoteInput.value = '';
+        sessionNotesModal.close();
+    });
+}
+
+// --- Break Modal Logic ---
+const breakModal = document.getElementById('break-modal');
+const closeBreakBtn = document.getElementById('close-break-btn');
+const startBreathingBtn = document.getElementById('start-breathing-btn');
+const breathingExercise = document.getElementById('breathing-exercise');
+const breathInstruction = document.getElementById('breath-instruction');
+
+if (closeBreakBtn) {
+    closeBreakBtn.addEventListener('click', () => {
+        breakModal.close();
+        if (breathingExercise) breathingExercise.classList.add('hidden');
+    });
+}
+
+if (startBreathingBtn) {
+    startBreathingBtn.addEventListener('click', () => {
+        breathingExercise.classList.remove('hidden');
+        startBreathingBtn.classList.add('hidden');
+
+        // 4-7-8 Breathing cycle
+        const phases = [
+            { text: "Breathe in...", duration: 4000 },
+            { text: "Hold...", duration: 7000 },
+            { text: "Breathe out...", duration: 8000 }
+        ];
+
+        let phaseIndex = 0;
+        let cycles = 0;
+
+        function runPhase() {
+            if (cycles >= 3) {
+                breathInstruction.textContent = "Great job! 🌟";
+                setTimeout(() => {
+                    breathingExercise.classList.add('hidden');
+                    startBreathingBtn.classList.remove('hidden');
+                }, 2000);
+                return;
+            }
+
+            breathInstruction.textContent = phases[phaseIndex].text;
+
+            setTimeout(() => {
+                phaseIndex++;
+                if (phaseIndex >= phases.length) {
+                    phaseIndex = 0;
+                    cycles++;
+                }
+                runPhase();
+            }, phases[phaseIndex].duration);
+        }
+
+        runPhase();
+    });
+}
+
+// Initialize cycle indicator on load
+updateCycleIndicator();
 
 // --- Mute Logic Helper ---
 function toggleMute() {

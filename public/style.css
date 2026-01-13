@@ -326,6 +326,89 @@ header p {
     color: var(--text-primary);
 }
 
+/* Status Indicator */
+.status-indicator {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+}
+
+/* Pomodoro Cycle Indicator */
+.cycle-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.cycle-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: all 0.3s;
+}
+
+.cycle-dot.active {
+    background: var(--accent-focus);
+    box-shadow: 0 0 8px var(--accent-focus);
+}
+
+.cycle-dot.completed {
+    background: var(--accent-focus);
+    opacity: 0.5;
+}
+
+.cycle-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-left: 8px;
+}
+
+/* Breathing Exercise */
+.breathing-exercise {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.breath-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-focus), var(--accent-break));
+    animation: breathe 8s ease-in-out infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes breathe {
+
+    0%,
+    100% {
+        transform: scale(0.6);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+#breath-instruction {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.controls {
+    align-items: center;
+    gap: 8px;
+}
+
 .feature-card h3 {
     margin: 0 0 16px 0;
     font-size: 0.95rem;
