@@ -76,7 +76,13 @@
                 <div class="features-grid">
                     <!-- Ambient Sounds -->
                     <div class="feature-card sound-card">
-                        <h3>Ambience</h3>
+                        <div class="card-header-row"
+                            style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+                            onclick="this.parentElement.querySelector('.sound-controls').classList.toggle('hidden')">
+                            <h3 style="margin: 0;">Ambience</h3>
+                            <i class="fa-solid fa-chevron-down"
+                                style="font-size: 0.8rem; color: var(--text-secondary);"></i>
+                        </div>
                         <div class="sound-controls">
                             <div class="sound-item">
                                 <button class="sound-btn" data-sound="rain" title="Rain">
