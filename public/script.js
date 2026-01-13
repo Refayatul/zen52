@@ -5,6 +5,7 @@ const DEFAULT_BREAK_TIME = 17 * 60;
 // Load settings from local storage or default
 let focusDuration = parseInt(localStorage.getItem('zen52_focus_time')) || DEFAULT_FOCUS_TIME;
 let breakDuration = parseInt(localStorage.getItem('zen52_break_time')) || DEFAULT_BREAK_TIME;
+let dailyGoalHours = parseFloat(localStorage.getItem('zen52_daily_goal')) || 4;
 
 let timeLeft = focusDuration;
 let timerId = null;
@@ -28,6 +29,12 @@ const soundSliders = document.querySelectorAll('.volume-slider');
 const taskInput = document.getElementById('task-input');
 const addTaskBtn = document.getElementById('add-task-btn');
 const taskListUl = document.getElementById('task-list');
+
+// Goal & Quote Elements
+const dailyGoalText = document.getElementById('daily-goal-text');
+const dailyGoalProgress = document.getElementById('daily-goal-progress');
+const goalInput = document.getElementById('daily-goal-input'); // In Settings
+const quoteText = document.getElementById('quote-text');
 
 // Settings Elements
 const settingsBtn = document.getElementById('settings-btn');
@@ -142,6 +149,42 @@ function checkBadges(sessions) {
     }
 
     return currentStreak;
+}
+
+function updateDailyGoal(sessions) {
+    const todayStr = new Date().toLocaleDateString();
+
+    // Filter sessions for today
+    const todaySessions = sessions.filter(s =>
+        s.type === 'focus' &&
+        new Date(s.created_at).toLocaleDateString() === todayStr
+    );
+
+    const totalMinutes = todaySessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
+    const totalHours = totalMinutes / 60;
+
+    // Render
+    const percent = Math.min((totalHours / dailyGoalHours) * 100, 100);
+    dailyGoalProgress.style.width = `${percent}%`;
+    dailyGoalText.textContent = `${totalHours.toFixed(1)} / ${dailyGoalHours} hrs`;
+}
+
+const QUOTES = [
+    "Focus is the key to productivity.",
+    "Do one thing at a time.",
+    "Simplicity is the ultimate sophistication.",
+    "The journey of a thousand miles begins with one step.",
+    "Productivity is being able to do things that you were never able to do before.",
+    "Your future is created by what you do today, not tomorrow.",
+    "It’s not always that we need to do more but rather that we need to focus on less.",
+    "Starve your distractions, feed your focus.",
+    "Don't busy, be productive.",
+    "Flow with the moment."
+];
+
+function showRandomQuote() {
+    const randomIndex = Math.floor(Math.random() * QUOTES.length);
+    quoteText.textContent = `"${QUOTES[randomIndex]}"`;
 }
 async function saveSession(duration, type) {
     const session = {
@@ -278,6 +321,7 @@ settingsBtn.addEventListener('click', () => {
     // Pre-populate values
     focusInput.value = Math.floor(focusDuration / 60);
     breakInput.value = Math.floor(breakDuration / 60);
+    goalInput.value = dailyGoalHours;
     settingsModal.showModal();
 });
 
@@ -600,4 +644,5 @@ function renderChart(sessions) {
 updateDisplay();
 fetchHistory();
 renderTasks();
+showRandomQuote();
 
