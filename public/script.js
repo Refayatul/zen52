@@ -34,7 +34,6 @@ const taskListUl = document.getElementById('task-list');
 const dailyGoalText = document.getElementById('daily-goal-text');
 const dailyGoalProgress = document.getElementById('daily-goal-progress');
 const goalInput = document.getElementById('daily-goal-input'); // In Settings
-const goalInput = document.getElementById('daily-goal-input'); // In Settings
 const quoteText = document.getElementById('quote-text');
 const scratchpad = document.getElementById('scratchpad'); // New
 
