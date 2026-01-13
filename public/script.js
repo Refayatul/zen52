@@ -541,8 +541,12 @@ taskInput.addEventListener('keypress', (e) => {
 
 // --- Keyboard Shortcuts ---
 document.addEventListener('keydown', (e) => {
-    // Ignore shortcuts if typing in input
-    if (document.activeElement.tagName === 'INPUT') return;
+    // Ignore shortcuts if typing in input or textarea
+    const activeElement = document.activeElement;
+    const isTyping = activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA';
+
+    if (isTyping) return;
 
     if (e.code === 'Space') {
         e.preventDefault(); // Prevent scrolling
