@@ -322,6 +322,7 @@ async function fetchHistory() {
         if (!response.ok) throw new Error('Failed to fetch history');
         const sessions = await response.json();
         renderHistory(sessions);
+        renderChart(sessions);
     } catch (error) {
         // Silent fail
     }
@@ -329,11 +330,14 @@ async function fetchHistory() {
 
 function renderHistory(sessions) {
     historyList.innerHTML = '';
-    if (sessions.length === 0) {
+    // Show top 5 recent in list
+    const recentSessions = sessions.slice(0, 5);
+
+    if (recentSessions.length === 0) {
         historyList.innerHTML = '<li class="loading-text">No recent sessions found.</li>';
         return;
     }
-    sessions.forEach(session => {
+    recentSessions.forEach(session => {
         const date = new Date(session.created_at).toLocaleDateString();
         const li = document.createElement('li');
         li.className = 'history-item';
@@ -343,6 +347,77 @@ function renderHistory(sessions) {
         `;
         historyList.appendChild(li);
     });
+}
+
+// --- Chart Logic ---
+let focusChart = null;
+
+function renderChart(sessions) {
+    const ctx = document.getElementById('weekly-chart');
+    if (!ctx) return;
+
+    // Group by Date for the last 7 days
+    const dailyTotals = {};
+    sessions.forEach(session => {
+        if (session.type === 'focus') {
+            // Normalize date to string (local locale)
+            const dateStr = new Date(session.created_at).toLocaleDateString();
+            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
+        }
+    });
+
+    const labels = [];
+    const data = [];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString();
+        const dayName = i === 0 ? 'Today' : days[d.getDay()];
+
+        labels.push(dayName);
+        data.push(dailyTotals[dateStr] || 0);
+    }
+
+    if (focusChart) {
+        focusChart.destroy();
+    }
+
+    // Chart.js requires script tag in html, assumed present
+    if (typeof Chart !== 'undefined') {
+        focusChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Focus Minutes',
+                    data: data,
+                    backgroundColor: '#238636',
+                    borderRadius: 4,
+                    hoverBackgroundColor: '#2ea043'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#8b949e' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
 }
 
 // Initial Init

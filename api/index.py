@@ -50,7 +50,7 @@ def get_history():
 
     try:
         # Fetch last 5 sessions, ordered by created_at descending
-        response = supabase.table('sessions').select("*").order('created_at', desc=True).limit(5).execute()
+        response = supabase.table('sessions').select("*").order('created_at', desc=True).limit(100).execute()
         return jsonify(response.data), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
