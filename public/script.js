@@ -34,13 +34,18 @@ const taskListUl = document.getElementById('task-list');
 const dailyGoalText = document.getElementById('daily-goal-text');
 const dailyGoalProgress = document.getElementById('daily-goal-progress');
 const goalInput = document.getElementById('daily-goal-input'); // In Settings
+const goalInput = document.getElementById('daily-goal-input'); // In Settings
 const quoteText = document.getElementById('quote-text');
+const scratchpad = document.getElementById('scratchpad'); // New
 
 // Settings Elements
 const settingsBtn = document.getElementById('settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings');
 const saveSettingsBtn = document.getElementById('save-settings');
+const shortcutsBtn = document.getElementById('shortcuts-btn'); // New
+const shortcutsModal = document.getElementById('shortcuts-modal'); // New
+const closeShortcutsBtn = document.getElementById('close-shortcuts'); // New
 const focusInput = document.getElementById('focus-duration');
 const breakInput = document.getElementById('break-duration');
 
@@ -321,8 +326,16 @@ settingsBtn.addEventListener('click', () => {
     // Pre-populate values
     focusInput.value = Math.floor(focusDuration / 60);
     breakInput.value = Math.floor(breakDuration / 60);
-    goalInput.value = dailyGoalHours;
+    if (goalInput) goalInput.value = dailyGoalHours;
     settingsModal.showModal();
+});
+
+// Presets
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        focusInput.value = btn.dataset.focus;
+        breakInput.value = btn.dataset.break;
+    });
 });
 
 closeSettingsBtn.addEventListener('click', () => {
@@ -473,6 +486,10 @@ document.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'r') {
         resetTimer();
     }
+
+    if (e.key.toLowerCase() === 'm') {
+        toggleMute();
+    }
 });
 
 // History Logic
@@ -579,6 +596,7 @@ function renderHistory(sessions) {
 let focusChart = null;
 
 function renderChart(sessions) {
+    if (typeof renderHeatmap === 'function') renderHeatmap(sessions);
     const ctx = document.getElementById('weekly-chart');
     if (!ctx) return;
 
@@ -644,6 +662,174 @@ function renderChart(sessions) {
             }
         });
     }
+}
+
+// --- Heatmap Logic ---
+function renderHeatmap(sessions) {
+    const grid = document.getElementById('heatmap-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Calculate daily totals for last 365 days
+    const dailyTotals = {};
+    sessions.forEach(session => {
+        if (session.type === 'focus') {
+            const dateStr = new Date(session.created_at).toLocaleDateString();
+            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
+        }
+    });
+
+    // Generate last ~52 weeks (approx 364 days to keep grid clean 7x52)
+    const today = new Date();
+    // Start date: 52 weeks ago (aligned to Sunday if we want standard calendar, but simplify for now)
+    // Actually, let's just do 52 columns * 7 rows = 364 squares
+    // We render backwards or forwards? Usually columns are weeks.
+
+    // We need 52 colums. Each column 7 rows (Sun-Sat).
+    // Let's iterate weeks, then days.
+
+    // Determine start date: Today minus 364 days?
+    // Let's just create 365 divs? CSS grid-auto-flow: column handles the wrapping if we fix rows to 7.
+    // We need to order them correctly. grid-auto-flow: column fills col 1 (row1...7), then col 2.
+    // So we just need to push days in chronological order.
+
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - 364);
+    // Adjustment to align start date to a Sunday?
+    // If we indiscriminately push days, and the first day is Wednesday, it will appear as Sunday (row 1).
+    // To align correctly: calculate offset to previous Sunday.
+    const dayOfWeek = startDate.getDay(); // 0 (Sun) to 6 (Sat)
+    startDate.setDate(startDate.getDate() - dayOfWeek); // Go back to Sunday
+
+    // Now loop for 53 weeks * 7 days to cover full width or until Today
+    const oneYearFromStart = new Date(today); // cap it?
+
+    // Let's render 53 weeks
+    for (let i = 0; i < 53 * 7; i++) {
+        const current = new Date(startDate);
+        current.setDate(startDate.getDate() + i);
+
+        if (current > today) break; // Don't show future? Or fill with empty.
+
+        const dateStr = current.toLocaleDateString();
+        const minutes = dailyTotals[dateStr] || 0;
+
+        let level = 0;
+        if (minutes > 0) level = 1;
+        if (minutes >= 30) level = 2;
+        if (minutes >= 60) level = 3;
+        if (minutes >= 120) level = 4;
+
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell';
+        cell.dataset.level = level;
+        cell.title = `${dateStr}: ${minutes} mins`;
+        grid.appendChild(cell);
+    }
+}
+
+// Chart Toggling
+const chartToggleBtn = document.getElementById('chart-toggle-btn');
+const chartContainer = document.getElementById('chart-container');
+const heatmapContainer = document.getElementById('heatmap-container');
+
+if (chartToggleBtn) {
+    // Load pref
+    const pref = localStorage.getItem('zen52_chart_pref') || 'bar';
+    if (pref === 'heatmap') {
+        chartContainer.classList.add('hidden');
+        heatmapContainer.classList.remove('hidden');
+        chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all'); // Switch icon to 'grid' look
+    }
+
+    chartToggleBtn.addEventListener('click', () => {
+        const isBar = !chartContainer.classList.contains('hidden');
+        if (isBar) {
+            // Switch to Heatmap
+            chartContainer.classList.add('hidden');
+            heatmapContainer.classList.remove('hidden');
+            chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
+            localStorage.setItem('zen52_chart_pref', 'heatmap');
+        } else {
+            // Switch to Bar
+            heatmapContainer.classList.add('hidden');
+            chartContainer.classList.remove('hidden');
+            chartToggleBtn.querySelector('i').classList.replace('fa-border-all', 'fa-chart-simple');
+            localStorage.setItem('zen52_chart_pref', 'bar'); // Fixed typo
+        }
+    });
+}
+
+// Hook into fetchHistory to render heatmap
+const originalFetchHistory = fetchHistory; // Wait, I can just append to the function body via replace... 
+// But I am rewriting the end of the file or specific logic? 
+// The tool I'm using replaces a block.
+// I replaced renderChart logic above. I should ensure renderHeatmap is CALLED.
+// Let's modify the fetchHistory function or helper.
+// Actually, I can just call renderHeatmap(sessions) inside renderChart? No, different responsibility.
+// Let's update renderChart to also call renderHeatmap or update fetchHistory.
+// Since I am replacing the renderChart function definition above, I can't easily hook there.
+// I will just add renderHeatmap(sessions) to the end of renderChart? 
+// No, better to update fetchHistory. But I am replacing the end of the file.
+
+// Let's just update renderChart to ALWAYS update the heatmap data too, since they share the same sessions data.
+// That way fetchHistory calls renderChart -> renderChart updates both visuals.
+// Efficient enough for now.
+
+// Wait, looking at the ReplacementContent above... I am defining renderHeatmap but NOT calling it.
+// I will rewrite renderChart above to call renderHeatmap(sessions) at start or end.
+
+// RE-WRITING RenderChart start to include heatmap call:
+/*
+function renderChart(sessions) {
+    renderHeatmap(sessions); // <--- Added
+    const ctx = document.getElementById('weekly-chart');
+...
+*/
+
+// --- Scratchpad Logic ---
+if (scratchpad) {
+    // Load
+    scratchpad.value = localStorage.getItem('zen52_scratchpad') || '';
+
+    // Save
+    scratchpad.addEventListener('input', () => {
+        localStorage.setItem('zen52_scratchpad', scratchpad.value);
+    });
+}
+
+// --- Shortcuts Modal Logic ---
+if (shortcutsBtn) {
+    shortcutsBtn.addEventListener('click', () => shortcutsModal.showModal());
+    closeShortcutsBtn.addEventListener('click', () => shortcutsModal.close());
+    // Close on backdrop click
+    shortcutsModal.addEventListener('click', (e) => {
+        if (e.target === shortcutsModal) shortcutsModal.close();
+    });
+}
+
+// --- Mute Logic Helper ---
+function toggleMute() {
+    let anyMuted = false;
+    // Check if any active sound is muted (simplified: just toggle all based on first)
+    // Actually, let's just mute/unmute all Audio elements
+    const audios = document.querySelectorAll('audio'); // We created them dynamically? No, we need to grab them.
+    // Wait, we don't have audio tags, we create new Audio() objects in startTimer? 
+    // Ah, ambient sounds uses <audio> tags? No, the code says:  const audio = document.getElementById(`audio-${soundType}`);
+    // So there ARE audio tags in HTML.
+
+    const allAudios = document.querySelectorAll('audio');
+    let allMuted = true;
+    allAudios.forEach(a => {
+        if (!a.muted) allMuted = false;
+    });
+
+    const newState = !allMuted;
+    allAudios.forEach(a => {
+        a.muted = newState;
+    });
+
+    triggerNotification(newState ? "Muted" : "Unmuted", "All sounds audio toggled.");
 }
 
 // Initial Init
