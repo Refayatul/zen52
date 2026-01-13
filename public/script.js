@@ -37,6 +37,9 @@ const saveSettingsBtn = document.getElementById('save-settings');
 const focusInput = document.getElementById('focus-duration');
 const breakInput = document.getElementById('break-duration');
 
+// --- Local Storage History Logic ---
+let localSessions = JSON.parse(localStorage.getItem('zen52_sessions')) || [];
+
 // --- Helper Functions ---
 function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
@@ -140,19 +143,31 @@ function checkBadges(sessions) {
 
     return currentStreak;
 }
-try {
-    const response = await fetch('/api/save-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration, type }),
-    });
+async function saveSession(duration, type) {
+    const session = {
+        id: Date.now(),
+        created_at: new Date().toISOString(),
+        duration: duration,
+        type: type
+    };
 
-    if (response.ok) {
-        fetchHistory();
+    // 1. Save Locally
+    localSessions.unshift(session);
+    localStorage.setItem('zen52_sessions', JSON.stringify(localSessions));
+
+    // Update UI immediately (Local First!)
+    fetchHistory();
+
+    // 2. Try Backend (Silent Sync)
+    try {
+        await fetch('/api/save-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ duration, type }),
+        });
+    } catch (error) {
+        console.log('Backend sync failed, but saved locally.');
     }
-} catch (error) {
-    console.error('Error saving session:', error);
-}
 }
 
 function triggerNotification(title, body) {
@@ -413,26 +428,80 @@ document.addEventListener('keydown', (e) => {
 });
 
 // History Logic
-async function fetchHistory() {
-    try {
-        const response = await fetch('/api/history');
-        if (!response.ok) throw new Error('Failed to fetch history');
-        const sessions = await response.json();
-        renderHistory(sessions);
-        renderChart(sessions);
+function fetchHistory() {
+    // 1. Load from Local Variable (which is synced with localStorage)
+    const sessions = localSessions;
 
-        // Calculate Logic
-        const streak = checkBadges(sessions);
-        if (streak > 0) {
-            streakCountDisplay.textContent = streak;
-            streakContainer.classList.remove('hidden');
-        } else {
-            streakContainer.classList.add('hidden');
-        }
+    // 2. Render
+    renderHistory(sessions);
+    renderChart(sessions);
 
-    } catch (error) {
-        // Silent fail
+    // 3. Logic
+    const streak = checkBadges(sessions);
+    if (streak > 0) {
+        streakCountDisplay.textContent = streak;
+        streakContainer.classList.remove('hidden');
+    } else {
+        streakContainer.classList.add('hidden');
     }
+}
+
+// --- Data Backup & Restore ---
+const exportBtn = document.getElementById('export-data-btn');
+const importBtn = document.getElementById('import-data-btn');
+const importInput = document.getElementById('import-file-input');
+
+if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+        const data = {
+            sessions: JSON.parse(localStorage.getItem('zen52_sessions') || '[]'),
+            tasks: JSON.parse(localStorage.getItem('zen52_tasks') || '[]'),
+            settings: {
+                focus: localStorage.getItem('zen52_focus_time'),
+                break: localStorage.getItem('zen52_break_time'),
+                theme: localStorage.getItem('zen52_theme')
+            }
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `zen52_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+}
+
+if (importBtn) {
+    importBtn.addEventListener('click', () => importInput.click());
+
+    importInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+
+                // Restore
+                if (data.sessions) localStorage.setItem('zen52_sessions', JSON.stringify(data.sessions));
+                if (data.tasks) localStorage.setItem('zen52_tasks', JSON.stringify(data.tasks));
+                if (data.settings) {
+                    if (data.settings.focus) localStorage.setItem('zen52_focus_time', data.settings.focus);
+                    if (data.settings.break) localStorage.setItem('zen52_break_time', data.settings.break);
+                    if (data.settings.theme) localStorage.setItem('zen52_theme', data.settings.theme);
+                }
+
+                alert('Data imported successfully! Reloading...');
+                location.reload();
+            } catch (err) {
+                alert('Invalid backup file.');
+            }
+        };
+        reader.readAsText(file);
+    });
 }
 
 function renderHistory(sessions) {

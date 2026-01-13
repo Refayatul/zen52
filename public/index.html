@@ -143,6 +143,17 @@
                     <label for="break-duration">Break Duration (minutes)</label>
                     <input type="number" id="break-duration" value="17" min="1" max="60">
                 </div>
+
+                <hr class="modal-divider">
+
+                <div class="setting-group-row">
+                    <button id="export-data-btn" class="btn secondary small">Export Data <i
+                            class="fa-solid fa-download"></i></button>
+                    <button id="import-data-btn" class="btn secondary small">Import Data <i
+                            class="fa-solid fa-upload"></i></button>
+                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                </div>
+
                 <button id="save-settings" class="btn primary full-width">Save Changes</button>
             </div>
         </dialog>

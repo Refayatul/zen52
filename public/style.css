@@ -471,6 +471,24 @@ header p {
 }
 
 /* Settings Modal */
+.modal-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
+}
+
+.setting-group-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn.small {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    flex: 1;
+}
+
 .settings-modal {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
