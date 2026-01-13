@@ -11,6 +11,17 @@
     --font-main: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 
+/* Light Mode Override */
+body.light-mode {
+    --bg-color: #f6f8fa;
+    --card-bg: #ffffff;
+    --text-primary: #24292f;
+    --text-secondary: #57606a;
+    --border-color: #d0d7de;
+    --accent-active: #0969da;
+}
+
+/* Base Styles (Dark Mode Default) */
 body {
     background-color: var(--bg-color);
     color: var(--text-primary);
@@ -22,6 +33,7 @@ body {
     padding: 20px;
     box-sizing: border-box;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .app-wrapper {
@@ -178,6 +190,56 @@ header p {
     border-radius: 16px;
     padding: 20px;
     text-align: left;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+/* Badges Grid */
+.badges-grid {
+    display: flex;
+    justify-content: space-around;
+    gap: 12px;
+}
+
+.badge-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 30%;
+    text-align: center;
+}
+
+.badge-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--bg-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s;
+}
+
+.badge-item span {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* Unlocked State */
+.badge-item:not(.locked) .badge-icon {
+    background: rgba(255, 215, 0, 0.1);
+    /* Gold tint */
+    color: #ffd700;
+    border-color: #ffd700;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.badge-item:not(.locked) span {
+    color: var(--text-primary);
 }
 
 .feature-card h3 {

@@ -20,6 +20,9 @@ const historyList = document.getElementById('history-list');
 
 // Zen & Features Elements
 const zenToggle = document.getElementById('zen-toggle');
+const themeToggle = document.getElementById('theme-toggle'); // New
+const streakContainer = document.getElementById('streak-container'); // New
+const streakCountDisplay = document.getElementById('streak-count'); // New
 const soundBtns = document.querySelectorAll('.sound-btn');
 const soundSliders = document.querySelectorAll('.volume-slider');
 const taskInput = document.getElementById('task-input');
@@ -62,20 +65,94 @@ function switchMode() {
     updateDisplay();
 }
 
-async function saveSession(duration, type) {
-    try {
-        const response = await fetch('/api/save-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ duration, type }),
-        });
+// --- Gamification Logic ---
+function calculateStreak(sessions) {
+    // Basic streak: Consecutive days with at least 1 focus session
+    const uniqueDays = [...new Set(sessions
+        .filter(s => s.type === 'focus')
+        .map(s => new Date(s.created_at).toLocaleDateString())
+    )]; // List of unique date strings
 
-        if (response.ok) {
-            fetchHistory();
+    // Convert keys to dates and sort descending
+    const sortedDates = uniqueDays.map(d => new Date(d)).sort((a, b) => b - a);
+
+    let streak = 0;
+    if (sortedDates.length === 0) return 0;
+
+    // For simplicity MVP: just count unique days in sorted list that effectively form a chain
+    // But we need to ensure the chain starts from *now*.
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastSessionDate = sortedDates[0];
+    lastSessionDate.setHours(0, 0, 0, 0);
+
+    // If last session was before yesterday, streak is broken (0)
+    // 86400000 ms = 1 day
+    const diff = (today - lastSessionDate) / 86400000;
+
+    if (diff > 1) return 0; // Broke streak
+
+    streak = 1;
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+        const curr = sortedDates[i].getTime();
+        const prev = sortedDates[i + 1].getTime(); // Older date
+
+        const dayDiff = Math.abs((curr - prev) / 86400000); // Should use abs or ensure sort order
+
+        if (Math.round(dayDiff) === 1) {
+            streak++;
+        } else {
+            break;
         }
-    } catch (error) {
-        console.error('Error saving session:', error);
     }
+
+    return streak;
+}
+
+function checkBadges(sessions) {
+    const focusSessions = sessions.filter(s => s.type === 'focus');
+    const totalMinutes = focusSessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
+    const currentStreak = calculateStreak(sessions);
+
+    // Badges definitions
+    const badges = {
+        'novice': focusSessions.length >= 1,
+        'streak': currentStreak >= 3,
+        'master': (totalMinutes / 60) >= 10
+    };
+
+    // Update UI
+    for (const [key, unlocked] of Object.entries(badges)) {
+        const badgeEl = document.getElementById(`badge-${key}`);
+        if (badgeEl) {
+            if (unlocked) {
+                if (badgeEl.classList.contains('locked')) {
+                    // Just unlocked! Could toast here.
+                    triggerNotification("Badge Unlocked!", `You earned the ${key} badge!`);
+                }
+                badgeEl.classList.remove('locked');
+            } else {
+                badgeEl.classList.add('locked');
+            }
+        }
+    }
+
+    return currentStreak;
+}
+try {
+    const response = await fetch('/api/save-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration, type }),
+    });
+
+    if (response.ok) {
+        fetchHistory();
+    }
+} catch (error) {
+    console.error('Error saving session:', error);
+}
 }
 
 function triggerNotification(title, body) {
@@ -160,6 +237,26 @@ zenToggle.addEventListener('click', () => {
         icon.classList.replace('fa-compress', 'fa-expand');
     }
 });
+
+// --- Theme Toggle ---
+themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light-mode');
+    const icon = themeToggle.querySelector('i');
+    const isLight = document.body.classList.contains('light-mode');
+
+    // Switch Icon
+    if (isLight) icon.classList.replace('fa-sun', 'fa-moon');
+    else icon.classList.replace('fa-moon', 'fa-sun');
+
+    // Save pref
+    localStorage.setItem('zen52_theme', isLight ? 'light' : 'dark');
+});
+
+// Load Theme
+if (localStorage.getItem('zen52_theme') === 'light') {
+    document.body.classList.add('light-mode');
+    themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+}
 
 // --- Settings Logic ---
 settingsBtn.addEventListener('click', () => {
@@ -323,6 +420,16 @@ async function fetchHistory() {
         const sessions = await response.json();
         renderHistory(sessions);
         renderChart(sessions);
+
+        // Calculate Logic
+        const streak = checkBadges(sessions);
+        if (streak > 0) {
+            streakCountDisplay.textContent = streak;
+            streakContainer.classList.remove('hidden');
+        } else {
+            streakContainer.classList.add('hidden');
+        }
+
     } catch (error) {
         // Silent fail
     }
