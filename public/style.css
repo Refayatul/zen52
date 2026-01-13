@@ -755,15 +755,18 @@ body.zen-mode .timer:hover {
 /* Heatmap Styles */
 .chart-container {
     position: relative;
-    height: 200px;
+    height: 250px;
     width: 100%;
 }
 
 .heatmap-container {
     width: 100%;
+    height: 250px;
+    /* Same as chart-container */
     overflow-x: auto;
     overflow-y: hidden;
     padding: 10px 0;
+    box-sizing: border-box;
 }
 
 .heatmap-grid {

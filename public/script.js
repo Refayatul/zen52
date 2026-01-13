@@ -759,12 +759,12 @@ const chartContainer = document.getElementById('chart-container');
 const heatmapContainer = document.getElementById('heatmap-container');
 
 if (chartToggleBtn) {
-    // Load pref
-    const pref = localStorage.getItem('zen52_chart_pref') || 'bar';
+    // Load pref - DEFAULT TO HEATMAP
+    const pref = localStorage.getItem('zen52_chart_pref') || 'heatmap';
     if (pref === 'heatmap') {
         chartContainer.classList.add('hidden');
         heatmapContainer.classList.remove('hidden');
-        chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all'); // Switch icon to 'grid' look
+        chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
     }
 
     chartToggleBtn.addEventListener('click', () => {
@@ -780,7 +780,7 @@ if (chartToggleBtn) {
             heatmapContainer.classList.add('hidden');
             chartContainer.classList.remove('hidden');
             chartToggleBtn.querySelector('i').classList.replace('fa-border-all', 'fa-chart-simple');
-            localStorage.setItem('zen52_chart_pref', 'bar'); // Fixed typo
+            localStorage.setItem('zen52_chart_pref', 'bar');
         }
     });
 }
