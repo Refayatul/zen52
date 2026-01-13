@@ -696,11 +696,6 @@ body.zen-mode .timer:hover {
     }
 }
 
-.features-grid {
-    grid-template-columns: 1fr;
-}
-}
-
 @media (min-width: 769px) {
     .container {
         max-width: 1200px;
