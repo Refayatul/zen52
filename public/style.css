@@ -176,6 +176,48 @@ header p {
     justify-content: center;
 }
 
+/* Preset Chips */
+.preset-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.preset-chip {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+}
+
+.preset-chip:hover {
+    border-color: var(--accent-focus);
+    background: rgba(35, 134, 54, 0.1);
+    transform: translateY(-1px);
+}
+
+.preset-chip.active {
+    background: var(--accent-focus);
+    border-color: var(--accent-focus);
+    color: white;
+}
+
+.preset-time {
+    opacity: 0.7;
+    font-size: 0.75rem;
+    margin-left: 4px;
+}
+
 /* Features Grid */
 .features-grid {
     display: grid;

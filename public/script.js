@@ -329,11 +329,37 @@ settingsBtn.addEventListener('click', () => {
     settingsModal.showModal();
 });
 
-// Presets
-document.querySelectorAll('.preset-btn').forEach(btn => {
+// Presets (both in settings and main screen)
+document.querySelectorAll('.preset-chip, .preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        focusInput.value = btn.dataset.focus;
-        breakInput.value = btn.dataset.break;
+        const newFocus = parseInt(btn.dataset.focus);
+        const newBreak = parseInt(btn.dataset.break);
+
+        if (newFocus && newBreak) {
+            focusDuration = newFocus * 60;
+            breakDuration = newBreak * 60;
+
+            // Save to localStorage
+            localStorage.setItem('zen52_focus_time', focusDuration);
+            localStorage.setItem('zen52_break_time', breakDuration);
+
+            // Update timer if not running
+            if (!isRunning) {
+                if (isFocusMode) timeLeft = focusDuration;
+                else timeLeft = breakDuration;
+                updateDisplay();
+            }
+
+            // Update active state for chips
+            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+            if (btn.classList.contains('preset-chip')) {
+                btn.classList.add('active');
+            }
+
+            // Update settings inputs if modal is open
+            if (focusInput) focusInput.value = newFocus;
+            if (breakInput) breakInput.value = newBreak;
+        }
     });
 });
 
