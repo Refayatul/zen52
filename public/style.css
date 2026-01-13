@@ -664,25 +664,15 @@ body.zen-mode .timer:hover {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 20px;
-        align-items: start;
+        align-items: stretch;
+        /* Stretch to make cards equal height */
     }
 
-    /* Timer specific styling for desktop balance */
-    .timer {
-        font-size: 8rem;
-    }
-}
-
-@media (min-width: 769px) {
-    .container {
-        max-width: 1000px;
-    }
-
-    .features-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        align-items: start;
+    .feature-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        /* Force fill */
     }
 
     /* Timer specific styling for desktop balance */
