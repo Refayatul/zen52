@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base52 - Productive Work Cycles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Base52</h1>
+            <p>52 minutes focus &middot; 17 minutes break</p>
+        </header>
+
+        <main>
+            <div id="timer-display" class="timer">52:00</div>
+            <div class="status-indicator" id="status-text">Focus Mode</div>
+
+            <div class="controls">
+                <button id="start-btn" class="btn primary">Start</button>
+                <button id="reset-btn" class="btn secondary">Reset</button>
+            </div>
+        </main>
+
+        <section class="history-section">
+            <h2>Recent Sessions</h2>
+            <ul id="history-list" class="history-list">
+                <!-- History items will be populated here -->
+                <li class="loading-text">Loading history...</li>
+            </ul>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
