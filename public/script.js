@@ -1,1053 +1,1238 @@
-// --- Constants & State ---
-const DEFAULT_FOCUS_TIME = 52 * 60;
-const DEFAULT_BREAK_TIME = 17 * 60;
+const TEMPLATES = {
+    pomodoro: { name: "Pomodoro", focus: 25, break: 5 },
+    zen52: { name: "Zen52", focus: 52, break: 17 },
+    deep: { name: "Deep Work", focus: 90, break: 15 },
+    writing: { name: "Writing", focus: 45, break: 10 },
+    study: { name: "Study", focus: 50, break: 10 },
+    custom: { name: "Custom", focus: 52, break: 17 }
+};
 
-// Load settings from local storage or default
-let focusDuration = parseInt(localStorage.getItem('zen52_focus_time')) || DEFAULT_FOCUS_TIME;
-let breakDuration = parseInt(localStorage.getItem('zen52_break_time')) || DEFAULT_BREAK_TIME;
-let dailyGoalHours = parseFloat(localStorage.getItem('zen52_daily_goal')) || 4;
-
-let timeLeft = focusDuration;
-let timerId = null;
-let isRunning = false;
-let isFocusMode = true;
-
-// Pomodoro Cycle State
-let currentSession = parseInt(localStorage.getItem('zen52_current_session')) || 1;
+const LONG_BREAK_DURATION = 25 * 60;
 const SESSIONS_BEFORE_LONG_BREAK = 4;
-const LONG_BREAK_DURATION = 25 * 60; // 25 minutes
+const MS_DAY = 86400000;
 
-// Break Suggestions
-const breakSuggestions = [
-    "🧘 Stand up and stretch for 2 minutes",
-    "💧 Drink a glass of water",
-    "👀 Look at something 20 feet away for 20 seconds (20-20-20 rule)",
-    "🚶 Take a short walk around the room",
-    "🌬️ Take 5 deep breaths",
-    "🙆 Roll your shoulders and neck",
-    "🪟 Look outside a window for a minute",
-    "✋ Stretch your wrists and fingers",
-    "🧍 Do 10 jumping jacks",
-    "☕ Make yourself a hot drink"
+const BREAK_ROUTINES = [
+    { id: "stretch", name: "Stretch", text: "Stand up, open your shoulders, and stretch for two minutes." },
+    { id: "eyes", name: "Eye rest", text: "Look at something far away for 20 seconds." },
+    { id: "water", name: "Hydrate", text: "Drink a glass of water before the next block." },
+    { id: "walk", name: "Walk", text: "Take a short walk around the room." },
+    { id: "breathe", name: "Breathing", text: "Run a short breathing exercise." }
 ];
 
-// DOM Elements
-const timerDisplay = document.getElementById('timer-display');
-const statusText = document.getElementById('status-text');
-const startBtn = document.getElementById('start-btn');
-const resetBtn = document.getElementById('reset-btn');
-const historyList = document.getElementById('history-list');
+const BADGES = [
+    { id: "novice", code: "01", name: "Novice", unlocked: s => s.focusSessions >= 1 },
+    { id: "streak", code: "03", name: "Consistent", unlocked: s => s.streak >= 3 },
+    { id: "master", code: "10h", name: "Master", unlocked: s => s.totalMinutes >= 600 },
+    { id: "closer", code: "5T", name: "Closer", unlocked: s => s.completedTasks >= 5 },
+    { id: "deep", code: "90", name: "Deep", unlocked: s => s.longestSession >= 90 },
+    { id: "journal", code: "N", name: "Journal", unlocked: s => s.notes >= 3 }
+];
 
-// Zen & Features Elements
-const zenToggle = document.getElementById('zen-toggle');
-const themeToggle = document.getElementById('theme-toggle'); // New
-const streakContainer = document.getElementById('streak-container'); // New
-const streakCountDisplay = document.getElementById('streak-count'); // New
-const soundBtns = document.querySelectorAll('.sound-btn');
-const soundSliders = document.querySelectorAll('.volume-slider');
-const taskInput = document.getElementById('task-input');
-const addTaskBtn = document.getElementById('add-task-btn');
-const taskListUl = document.getElementById('task-list');
+const QUOTES = [
+    "Do one thing at a time.",
+    "Attention is a limited resource. Spend it deliberately.",
+    "A clear desk starts with a clear next task.",
+    "The goal is not more hours. The goal is better attention.",
+    "Protect the first minute and the next fifty-one get easier.",
+    "Less switching. More finishing.",
+    "Depth beats urgency when the work matters."
+];
 
-// Goal & Quote Elements
-const dailyGoalText = document.getElementById('daily-goal-text');
-const dailyGoalProgress = document.getElementById('daily-goal-progress');
-const goalInput = document.getElementById('daily-goal-input'); // In Settings
-const quoteText = document.getElementById('quote-text');
-const scratchpad = document.getElementById('scratchpad'); // New
+const $ = id => document.getElementById(id);
+const storage = {
+    get(key, fallback) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw == null ? fallback : JSON.parse(raw);
+        } catch {
+            return fallback;
+        }
+    },
+    set(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+    }
+};
 
-// Settings Elements
-const settingsBtn = document.getElementById('settings-btn');
-const settingsModal = document.getElementById('settings-modal');
-const closeSettingsBtn = document.getElementById('close-settings');
-const saveSettingsBtn = document.getElementById('save-settings');
-const shortcutsBtn = document.getElementById('shortcuts-btn'); // New
-const shortcutsModal = document.getElementById('shortcuts-modal'); // New
-const closeShortcutsBtn = document.getElementById('close-shortcuts'); // New
-const focusInput = document.getElementById('focus-duration');
-const breakInput = document.getElementById('break-duration');
+const defaults = {
+    focus: 52 * 60,
+    break: 17 * 60,
+    dailyGoal: 4,
+    goalType: "hours",
+    autoStartBreak: false,
+    autoStartFocus: false,
+    syncEnabled: false,
+    activeTemplate: "zen52",
+    currentSession: 1,
+    selectedTaskId: null,
+    currentIntention: "",
+    activeRoutine: "stretch",
+    soundProfile: null,
+    lastBackupAt: null,
+    lockdownUntil: 0
+};
 
-// --- Local Storage History Logic ---
-let localSessions = JSON.parse(localStorage.getItem('zen52_sessions')) || [];
+let settings = { ...defaults, ...storage.get("zen52_settings", {}) };
+let sessions = storage.get("zen52_sessions", []);
+let tasks = storage.get("zen52_tasks", []);
+let notes = storage.get("zen52_session_notes", []);
+let blockSets = storage.get("zen52_blocksets", []);
+let interruptions = storage.get("zen52_interruptions", []);
+let timeLeft = settings.focus;
+let isFocusMode = true;
+let isRunning = false;
+let timerId = null;
+let activeSession = null;
+let lastCompletedSessionId = null;
+let audioContext = null;
+const ambience = new Map();
 
-// --- Helper Functions ---
+const el = {
+    timer: $("timer-display"),
+    status: $("status-text"),
+    start: $("start-btn"),
+    reset: $("reset-btn"),
+    zenToggle: $("zen-toggle"),
+    zenExit: $("zen-exit-btn"),
+    theme: $("theme-toggle"),
+    commandBtn: $("command-btn"),
+    settingsBtn: $("settings-btn"),
+    settingsModal: $("settings-modal"),
+    closeSettings: $("close-settings"),
+    saveSettings: $("save-settings"),
+    focusInput: $("focus-duration"),
+    breakInput: $("break-duration"),
+    goalInput: $("daily-goal-input"),
+    goalTypeInput: $("goal-type-input"),
+    autoStartBreakInput: $("autostart-break-input"),
+    autoStartFocusInput: $("autostart-focus-input"),
+    syncEnabledInput: $("sync-enabled-input"),
+    syncStatus: $("sync-status"),
+    intention: $("intention-input"),
+    selectedTaskLabel: $("selected-task-label"),
+    zenTaskLabel: $("zen-task-label"),
+    templateLabel: $("active-template-label"),
+    taskInput: $("task-input"),
+    addTask: $("add-task-btn"),
+    clearCompleted: $("clear-completed-btn"),
+    taskList: $("task-list"),
+    scratchpad: $("scratchpad"),
+    clearScratchpad: $("clear-scratchpad-btn"),
+    customBtn: $("custom-timer-btn"),
+    customInput: $("custom-timer-input"),
+    quickFocus: $("quick-focus"),
+    quickBreak: $("quick-break"),
+    applyCustom: $("apply-custom-btn"),
+    chartToggle: $("chart-toggle-btn"),
+    chartContainer: $("chart-container"),
+    heatmapContainer: $("heatmap-container"),
+    weeklyChart: $("weekly-chart"),
+    heatmapGrid: $("heatmap-grid"),
+    historyList: $("history-list"),
+    badgesGrid: $("badges-grid"),
+    routineList: $("routine-list"),
+    blocksetNameInput: $("blockset-name-input"),
+    blocksetSitesInput: $("blockset-sites-input"),
+    blocksetTimesInput: $("blockset-times-input"),
+    blocksetLimitInput: $("blockset-limit-input"),
+    blocksetDelayInput: $("blockset-delay-input"),
+    lockdownMinsInput: $("lockdown-mins-input"),
+    addBlockset: $("add-blockset-btn"),
+    lockdown: $("lockdown-btn"),
+    guardrailStatus: $("guardrail-status"),
+    blocksetList: $("blockset-list"),
+    exportData: $("export-data-btn"),
+    importData: $("import-data-btn"),
+    importInput: $("import-file-input"),
+    backupReminder: $("backup-reminder"),
+    backupNow: $("backup-now-btn"),
+    backupDismiss: $("backup-dismiss-btn"),
+    shortcutsBtn: $("shortcuts-btn"),
+    shortcutsModal: $("shortcuts-modal"),
+    closeShortcuts: $("close-shortcuts"),
+    commandModal: $("command-modal"),
+    closeCommand: $("close-command"),
+    commandSearch: $("command-search"),
+    commandList: $("command-list"),
+    notesModal: $("session-notes-modal"),
+    sessionReviewCopy: $("session-review-copy"),
+    sessionNoteInput: $("session-note-input"),
+    markTaskDone: $("mark-task-done-btn"),
+    saveNote: $("save-note-btn"),
+    skipNote: $("skip-note-btn"),
+    breakModal: $("break-modal"),
+    breakSuggestion: $("break-suggestion"),
+    breathing: $("breathing-exercise"),
+    breathInstruction: $("breath-instruction"),
+    startBreathing: $("start-breathing-btn"),
+    closeBreak: $("close-break-btn"),
+    journalModal: $("journal-modal"),
+    openJournal: $("open-journal-btn"),
+    closeJournal: $("close-journal"),
+    journalSearch: $("journal-search"),
+    journalList: $("journal-list"),
+    quote: $("quote-text"),
+    dailyGoalText: $("daily-goal-text"),
+    dailyGoalProgress: $("daily-goal-progress"),
+    goalLabel: $("goal-label"),
+    streakContainer: $("streak-container"),
+    streakCount: $("streak-count")
+};
+
+function saveAll() {
+    storage.set("zen52_settings", settings);
+    storage.set("zen52_sessions", sessions);
+    storage.set("zen52_tasks", tasks);
+    storage.set("zen52_session_notes", notes);
+    storage.set("zen52_blocksets", blockSets);
+    storage.set("zen52_interruptions", interruptions);
+}
+
 function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function minutesLabel(minutes) {
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    const hours = minutes / 60;
+    return `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
+}
+
+function todayKey(date = new Date()) {
+    return date.toLocaleDateString();
+}
+
+function selectedTask() {
+    return tasks.find(task => task.id === settings.selectedTaskId) || null;
 }
 
 function updateDisplay() {
-    timerDisplay.textContent = formatTime(timeLeft);
-    const mode = isFocusMode ? 'Focus' : 'Break';
-    document.title = `${formatTime(timeLeft)} - ${mode} | Zen52`;
+    el.timer.textContent = formatTime(timeLeft);
+    document.title = `${formatTime(timeLeft)} - ${isFocusMode ? "Focus" : "Break"} | Zen52`;
+    const task = selectedTask();
+    const activeBlocks = activeBlockSets();
+    const label = task ? `Task: ${task.text}` : "No task linked";
+    const guardrails = activeBlocks.length ? ` · Avoid: ${activeBlocks.flatMap(set => set.sites).slice(0, 4).join(", ")}` : "";
+    el.selectedTaskLabel.textContent = label;
+    el.zenTaskLabel.textContent = `${label}${guardrails}`;
+    el.templateLabel.textContent = `Template: ${TEMPLATES[settings.activeTemplate]?.name || "Custom"}`;
 }
 
-function switchMode() {
-    isFocusMode = !isFocusMode;
-    timeLeft = isFocusMode ? focusDuration : breakDuration;
+function setStartButton(text) {
+    el.start.textContent = text;
+}
 
-    if (isFocusMode) {
-        statusText.textContent = "Focus Mode";
-        timerDisplay.classList.remove('break-mode');
-    } else {
-        statusText.textContent = "Break Mode";
-        timerDisplay.classList.add('break-mode');
-    }
-
+function applyTemplate(id) {
+    const template = TEMPLATES[id];
+    if (!template) return;
+    settings.activeTemplate = id;
+    settings.focus = template.focus * 60;
+    settings.break = template.break * 60;
+    if (!isRunning) timeLeft = isFocusMode ? settings.focus : settings.break;
+    document.querySelectorAll(".preset-chip").forEach(chip => chip.classList.toggle("active", chip.dataset.template === id || (id === "custom" && chip.id === "custom-timer-btn")));
+    saveAll();
     updateDisplay();
 }
 
-// --- Gamification Logic ---
-function calculateStreak(sessions) {
-    // Basic streak: Consecutive days with at least 1 focus session
-    const uniqueDays = [...new Set(sessions
-        .filter(s => s.type === 'focus')
-        .map(s => new Date(s.created_at).toLocaleDateString())
-    )]; // List of unique date strings
-
-    // Convert keys to dates and sort descending
-    const sortedDates = uniqueDays.map(d => new Date(d)).sort((a, b) => b - a);
-
-    let streak = 0;
-    if (sortedDates.length === 0) return 0;
-
-    // For simplicity MVP: just count unique days in sorted list that effectively form a chain
-    // But we need to ensure the chain starts from *now*.
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const lastSessionDate = sortedDates[0];
-    lastSessionDate.setHours(0, 0, 0, 0);
-
-    // If last session was before yesterday, streak is broken (0)
-    // 86400000 ms = 1 day
-    const diff = (today - lastSessionDate) / 86400000;
-
-    if (diff > 1) return 0; // Broke streak
-
-    streak = 1;
-    for (let i = 0; i < sortedDates.length - 1; i++) {
-        const curr = sortedDates[i].getTime();
-        const prev = sortedDates[i + 1].getTime(); // Older date
-
-        const dayDiff = Math.abs((curr - prev) / 86400000); // Should use abs or ensure sort order
-
-        if (Math.round(dayDiff) === 1) {
-            streak++;
-        } else {
-            break;
-        }
+function applyCustomDurations(focusMinutes, breakMinutes) {
+    if (!Number.isFinite(focusMinutes) || !Number.isFinite(breakMinutes) || focusMinutes <= 0 || breakMinutes <= 0) {
+        alert("Please enter valid positive numbers.");
+        return false;
     }
-
-    return streak;
+    settings.activeTemplate = "custom";
+    settings.focus = focusMinutes * 60;
+    settings.break = breakMinutes * 60;
+    TEMPLATES.custom.focus = focusMinutes;
+    TEMPLATES.custom.break = breakMinutes;
+    if (!isRunning) timeLeft = isFocusMode ? settings.focus : settings.break;
+    saveAll();
+    updatePresetLabels();
+    updateDisplay();
+    return true;
 }
 
-function checkBadges(sessions) {
-    const focusSessions = sessions.filter(s => s.type === 'focus');
-    const totalMinutes = focusSessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
-    const currentStreak = calculateStreak(sessions);
-
-    // Badges definitions
-    const badges = {
-        'novice': focusSessions.length >= 1,
-        'streak': currentStreak >= 3,
-        'master': (totalMinutes / 60) >= 10
-    };
-
-    // Update UI
-    for (const [key, unlocked] of Object.entries(badges)) {
-        const badgeEl = document.getElementById(`badge-${key}`);
-        if (badgeEl) {
-            if (unlocked) {
-                if (badgeEl.classList.contains('locked')) {
-                    // Just unlocked! Could toast here.
-                    triggerNotification("Badge Unlocked!", `You earned the ${key} badge!`);
-                }
-                badgeEl.classList.remove('locked');
-            } else {
-                badgeEl.classList.add('locked');
-            }
-        }
-    }
-
-    return currentStreak;
-}
-
-function updateDailyGoal(sessions) {
-    const todayStr = new Date().toLocaleDateString();
-
-    // Filter sessions for today
-    const todaySessions = sessions.filter(s =>
-        s.type === 'focus' &&
-        new Date(s.created_at).toLocaleDateString() === todayStr
-    );
-
-    const totalMinutes = todaySessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
-    const totalHours = totalMinutes / 60;
-
-    // Render
-    const percent = Math.min((totalHours / dailyGoalHours) * 100, 100);
-    dailyGoalProgress.style.width = `${percent}%`;
-    dailyGoalText.textContent = `${totalHours.toFixed(1)} / ${dailyGoalHours} hrs`;
-}
-
-const QUOTES = [
-    "Focus is the key to productivity.",
-    "Do one thing at a time.",
-    "Simplicity is the ultimate sophistication.",
-    "The journey of a thousand miles begins with one step.",
-    "Productivity is being able to do things that you were never able to do before.",
-    "Your future is created by what you do today, not tomorrow.",
-    "It’s not always that we need to do more but rather that we need to focus on less.",
-    "Starve your distractions, feed your focus.",
-    "Don't busy, be productive.",
-    "Flow with the moment."
-];
-
-function showRandomQuote() {
-    const randomIndex = Math.floor(Math.random() * QUOTES.length);
-    quoteText.textContent = `"${QUOTES[randomIndex]}"`;
-}
-async function saveSession(duration, type) {
-    const session = {
-        id: Date.now(),
-        created_at: new Date().toISOString(),
-        duration: duration,
-        type: type
-    };
-
-    // 1. Save Locally
-    localSessions.unshift(session);
-    localStorage.setItem('zen52_sessions', JSON.stringify(localSessions));
-
-    // Update UI immediately (Local First!)
-    fetchHistory();
-
-    // 2. Try Backend (Silent Sync)
-    try {
-        await fetch('/api/save-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ duration, type }),
-        });
-    } catch (error) {
-        console.log('Backend sync failed, but saved locally.');
-    }
-}
-
-function triggerNotification(title, body) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/favicon.ico' });
-    }
+function updatePresetLabels() {
+    document.querySelectorAll(".preset-chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.template === settings.activeTemplate || (settings.activeTemplate === "custom" && chip.id === "custom-timer-btn"));
+    });
 }
 
 function startTimer() {
     if (isRunning) return;
-
-    // Request Notification permission on first start
-    if (Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-
+    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     isRunning = true;
-    startBtn.textContent = 'Pause';
-    startBtn.style.backgroundColor = '#6e7681';
-
+    setStartButton("Pause");
+    if (isFocusMode && !activeSession) {
+        activeSession = {
+            id: Date.now(),
+            started_at: new Date().toISOString(),
+            intention: el.intention.value.trim(),
+            taskId: settings.selectedTaskId,
+            taskText: selectedTask()?.text || "",
+            template: settings.activeTemplate,
+            plannedDuration: Math.floor(settings.focus / 60),
+            pauseCount: 0
+        };
+    }
     timerId = setInterval(() => {
-        if (timeLeft > 0) {
-            timeLeft--;
-            updateDisplay();
-        } else {
-            clearInterval(timerId);
-            isRunning = false;
-            startBtn.textContent = 'Start Focus';
-            startBtn.style.backgroundColor = '';
-
-            if (isFocusMode) {
-                saveSession(Math.floor(focusDuration / 60), 'focus');
-                // Play notification sound
-                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3').play().catch(() => console.log('Audio blocked'));
-                triggerNotification("Focus Complete", "Great job! Time for a break.");
-
-                // Show Session Notes Modal
-                const sessionNotesModal = document.getElementById('session-notes-modal');
-                if (sessionNotesModal) sessionNotesModal.showModal();
-            } else {
-                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-simple-notification-26.mp3').play().catch(() => console.log('Audio blocked'));
-                triggerNotification("Break Over", "Time to focus again.");
-            }
-
-            switchMode();
+        if (timeLeft <= 0) {
+            completeInterval();
+            return;
         }
+        timeLeft -= 1;
+        updateDisplay();
     }, 1000);
 }
 
-function pauseTimer() {
+function pauseTimer(record = true) {
+    if (!isRunning && !timerId) return;
     clearInterval(timerId);
+    timerId = null;
     isRunning = false;
-    startBtn.textContent = 'Resume';
-    startBtn.style.backgroundColor = '';
+    setStartButton("Resume");
+    if (record && activeSession && isFocusMode) {
+        activeSession.pauseCount += 1;
+        interruptions.unshift({ id: Date.now(), at: new Date().toISOString(), reason: "pause", sessionId: activeSession.id });
+        saveAll();
+        renderData();
+    }
 }
 
 function resetTimer() {
-    pauseTimer();
+    if (activeSession && isFocusMode) {
+        interruptions.unshift({ id: Date.now(), at: new Date().toISOString(), reason: "reset", sessionId: activeSession.id });
+    }
+    clearInterval(timerId);
+    timerId = null;
+    isRunning = false;
+    activeSession = null;
     isFocusMode = true;
-    timeLeft = focusDuration;
-    statusText.textContent = "Focus Mode";
-    timerDisplay.classList.remove('break-mode');
-    startBtn.textContent = 'Start Focus';
+    timeLeft = settings.focus;
+    el.status.textContent = "Focus Mode";
+    el.timer.classList.remove("break-mode");
+    setStartButton("Start Focus");
+    saveAll();
+    updateDisplay();
+    renderData();
+}
+
+function completeInterval() {
+    clearInterval(timerId);
+    timerId = null;
+    isRunning = false;
+
+    if (isFocusMode) {
+        const session = {
+            id: activeSession?.id || Date.now(),
+            created_at: new Date().toISOString(),
+            duration: Math.floor(settings.focus / 60),
+            type: "focus",
+            intention: activeSession?.intention || el.intention.value.trim(),
+            taskId: activeSession?.taskId || settings.selectedTaskId,
+            taskText: activeSession?.taskText || selectedTask()?.text || "",
+            template: activeSession?.template || settings.activeTemplate,
+            pauseCount: activeSession?.pauseCount || 0,
+            note: ""
+        };
+        sessions.unshift(session);
+        lastCompletedSessionId = session.id;
+        activeSession = null;
+        settings.currentSession += 1;
+        if (settings.currentSession > SESSIONS_BEFORE_LONG_BREAK + 1) settings.currentSession = 1;
+        saveAll();
+        syncSession(session);
+        renderData();
+        updateCycleIndicator();
+        playTone(720);
+        notify("Focus complete", "Time for a deliberate break.");
+        el.sessionReviewCopy.textContent = session.intention ? `Intention: ${session.intention}` : "What did you accomplish?";
+        el.notesModal.showModal();
+        switchMode();
+        if (settings.autoStartBreak) startTimer();
+    } else {
+        if (settings.currentSession > SESSIONS_BEFORE_LONG_BREAK) settings.currentSession = 1;
+        saveAll();
+        renderData();
+        updateCycleIndicator();
+        playTone(520);
+        notify("Break over", "Start the next focus block when ready.");
+        switchMode();
+        if (settings.autoStartFocus) startTimer();
+    }
+}
+
+function switchMode() {
+    isFocusMode = !isFocusMode;
+    if (isFocusMode) {
+        timeLeft = settings.focus;
+        el.status.textContent = "Focus Mode";
+        el.timer.classList.remove("break-mode");
+        setStartButton("Start Focus");
+    } else {
+        const isLongBreak = settings.currentSession > SESSIONS_BEFORE_LONG_BREAK;
+        timeLeft = isLongBreak ? LONG_BREAK_DURATION : settings.break;
+        el.status.textContent = isLongBreak ? "Long Break" : "Break Mode";
+        el.timer.classList.add("break-mode");
+        setStartButton("Start Break");
+        showBreakModal();
+    }
     updateDisplay();
 }
 
-function updateCycleIndicator() {
-    const dots = document.querySelectorAll('.cycle-dot');
-    const label = document.getElementById('cycle-label');
-
-    dots.forEach((dot, index) => {
-        dot.classList.remove('active', 'completed');
-        if (index < currentSession - 1) {
-            dot.classList.add('completed');
-        } else if (index === currentSession - 1) {
-            dot.classList.add('active');
-        }
-    });
-
-    if (label) {
-        const displaySession = Math.min(currentSession, 4);
-        label.textContent = `Session ${displaySession}/4`;
-    }
-}
-// --- Event Listeners ---
-
-startBtn.addEventListener('click', () => {
-    if (isRunning) {
-        pauseTimer();
-    } else {
-        startTimer();
-    }
-});
-
-resetBtn.addEventListener('click', resetTimer);
-
-// --- Zen Mode ---
-zenToggle.addEventListener('click', () => {
-    document.body.classList.toggle('zen-mode');
-    const icon = zenToggle.querySelector('i');
-    if (document.body.classList.contains('zen-mode')) {
-        icon.classList.replace('fa-expand', 'fa-compress');
-    } else {
-        icon.classList.replace('fa-compress', 'fa-expand');
-    }
-});
-
-// --- Theme Toggle ---
-themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('light-mode');
-    const icon = themeToggle.querySelector('i');
-    const isLight = document.body.classList.contains('light-mode');
-
-    // Switch Icon
-    if (isLight) icon.classList.replace('fa-sun', 'fa-moon');
-    else icon.classList.replace('fa-moon', 'fa-sun');
-
-    // Save pref
-    localStorage.setItem('zen52_theme', isLight ? 'light' : 'dark');
-});
-
-// Load Theme
-if (localStorage.getItem('zen52_theme') === 'light') {
-    document.body.classList.add('light-mode');
-    themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+function notify(title, body) {
+    if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body });
 }
 
-// --- Settings Logic ---
-settingsBtn.addEventListener('click', () => {
-    // Pre-populate values
-    focusInput.value = Math.floor(focusDuration / 60);
-    breakInput.value = Math.floor(breakDuration / 60);
-    if (goalInput) goalInput.value = dailyGoalHours;
-    settingsModal.showModal();
-});
-
-// Presets (both in settings and main screen)
-document.querySelectorAll('.preset-chip, .preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const newFocus = parseInt(btn.dataset.focus);
-        const newBreak = parseInt(btn.dataset.break);
-
-        if (newFocus && newBreak) {
-            focusDuration = newFocus * 60;
-            breakDuration = newBreak * 60;
-
-            // Save to localStorage
-            localStorage.setItem('zen52_focus_time', focusDuration);
-            localStorage.setItem('zen52_break_time', breakDuration);
-
-            // Update timer if not running
-            if (!isRunning) {
-                if (isFocusMode) timeLeft = focusDuration;
-                else timeLeft = breakDuration;
-                updateDisplay();
-            }
-
-            // Update active state for chips
-            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
-            if (btn.classList.contains('preset-chip')) {
-                btn.classList.add('active');
-            }
-
-            // Update settings inputs if modal is open
-            if (focusInput) focusInput.value = newFocus;
-            if (breakInput) breakInput.value = newBreak;
-        }
-    });
-});
-
-// Custom Timer Logic
-const customTimerBtn = document.getElementById('custom-timer-btn');
-const customTimerInput = document.getElementById('custom-timer-input');
-const quickFocusInput = document.getElementById('quick-focus');
-const quickBreakInput = document.getElementById('quick-break');
-const applyCustomBtn = document.getElementById('apply-custom-btn');
-
-if (customTimerBtn) {
-    customTimerBtn.addEventListener('click', () => {
-        customTimerInput.classList.toggle('hidden');
-        // Pre-fill with current values
-        quickFocusInput.value = Math.floor(focusDuration / 60);
-        quickBreakInput.value = Math.floor(breakDuration / 60);
-    });
+function playTone(frequency) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.6);
+    } catch {}
 }
 
-if (applyCustomBtn) {
-    applyCustomBtn.addEventListener('click', () => {
-        const newFocus = parseInt(quickFocusInput.value);
-        const newBreak = parseInt(quickBreakInput.value);
-
-        if (newFocus > 0 && newBreak > 0) {
-            focusDuration = newFocus * 60;
-            breakDuration = newBreak * 60;
-
-            localStorage.setItem('zen52_focus_time', focusDuration);
-            localStorage.setItem('zen52_break_time', breakDuration);
-
-            if (!isRunning) {
-                if (isFocusMode) timeLeft = focusDuration;
-                else timeLeft = breakDuration;
-                updateDisplay();
-            }
-
-            // Hide input and mark custom as active
-            customTimerInput.classList.add('hidden');
-            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
-            customTimerBtn.classList.add('active');
-        }
-    });
-}
-
-closeSettingsBtn.addEventListener('click', () => {
-    settingsModal.close();
-});
-
-saveSettingsBtn.addEventListener('click', () => {
-    const newFocus = parseInt(focusInput.value);
-    const newBreak = parseInt(breakInput.value);
-    const newGoal = parseFloat(goalInput.value);
-
-    if (newFocus > 0 && newBreak > 0 && newGoal > 0) {
-        focusDuration = newFocus * 60;
-        breakDuration = newBreak * 60;
-        dailyGoalHours = newGoal;
-
-        // Save to local storage
-        localStorage.setItem('zen52_focus_time', focusDuration);
-        localStorage.setItem('zen52_break_time', breakDuration);
-        localStorage.setItem('zen52_daily_goal', dailyGoalHours);
-
-        // If timer is not running, update current display immediately if in relevant mode
-        if (!isRunning) {
-            if (isFocusMode) timeLeft = focusDuration;
-            else timeLeft = breakDuration;
-            updateDisplay();
-        }
-
-        fetchHistory(); // Update goal UI if changed
-        settingsModal.close();
-    } else {
-        alert("Please enter valid positive numbers.");
+function syncSession(session) {
+    if (!settings.syncEnabled) {
+        el.syncStatus.textContent = "Sync status: local only";
+        return;
     }
-});
-
-// --- Sound Logic & Volume ---
-let currentSound = null;
-
-// Volume Sliders
-soundSliders.forEach(slider => {
-    slider.addEventListener('input', (e) => {
-        const soundType = e.target.dataset.sound;
-        const audio = document.getElementById(`audio-${soundType}`);
-        audio.volume = e.target.value;
-    });
-    // Set initial volume
-    const soundType = slider.dataset.sound;
-    const audio = document.getElementById(`audio-${soundType}`);
-    if (audio) audio.volume = slider.value;
-});
-
-// Play Buttons
-soundBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const soundType = btn.dataset.sound;
-        const audio = document.getElementById(`audio-${soundType}`);
-
-        // Match volume to slider
-        const slider = document.querySelector(`.volume-slider[data-sound="${soundType}"]`);
-        if (slider) audio.volume = slider.value;
-
-        // Toggle Logic
-        if (btn.classList.contains('active')) {
-            audio.pause();
-            audio.currentTime = 0;
-            btn.classList.remove('active');
-
-            // If this was the only sound playing, clear currentSound (simple logic)
-            if (currentSound === audio) currentSound = null;
-            return;
-        }
-
-        // Allow multiple sounds? Why not (It's a "Mixer" feature). 
-        // Previously we stopped others. Now let's allow mixing since we added volume controls!
-        // but if user wants single focus, they can just click one.
-
-        // Play
-        audio.play().then(() => {
-            btn.classList.add('active');
-            currentSound = audio; // Track last played
-        }).catch(e => {
-            console.log("Audio file missing or blocked", e);
-            alert(`Tip: Place a file named '${soundType}.mp3' in public/sounds/ to hear this!`);
+    fetch("/api/save-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duration: session.duration, type: session.type, intention: session.intention, task: session.taskText })
+    })
+        .then(response => {
+            el.syncStatus.textContent = response.ok ? "Sync status: last session synced" : "Sync status: backend unavailable";
+        })
+        .catch(() => {
+            el.syncStatus.textContent = "Sync status: backend unavailable";
         });
+}
+
+function calculateStats() {
+    const focus = sessions.filter(s => s.type === "focus");
+    const today = todayKey();
+    const todaySessions = focus.filter(s => new Date(s.created_at).toLocaleDateString() === today);
+    const todayMinutes = todaySessions.reduce((sum, s) => sum + Number(s.duration || 0), 0);
+    const completedTasksToday = tasks.filter(t => t.completed && t.completedAt && new Date(t.completedAt).toLocaleDateString() === today).length;
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 6 * MS_DAY);
+    const monthAgo = new Date(now.getTime() - 29 * MS_DAY);
+    const weekTotal = focus.filter(s => new Date(s.created_at) >= weekAgo).reduce((sum, s) => sum + Number(s.duration || 0), 0);
+    const monthTotal = focus.filter(s => new Date(s.created_at) >= monthAgo).reduce((sum, s) => sum + Number(s.duration || 0), 0);
+    const dailyTotals = getDailyTotals(sessions);
+    const bestDay = Math.max(0, ...Object.values(dailyTotals));
+    const totalMinutes = focus.reduce((sum, s) => sum + Number(s.duration || 0), 0);
+    return {
+        focusSessions: focus.length,
+        todayMinutes,
+        todaySessions: todaySessions.length,
+        completedTasks: tasks.filter(t => t.completed).length,
+        completedTasksToday,
+        interruptions: interruptions.length,
+        weekTotal,
+        monthTotal,
+        bestDay,
+        avgSession: focus.length ? totalMinutes / focus.length : 0,
+        totalMinutes,
+        longestSession: Math.max(0, ...focus.map(s => Number(s.duration || 0))),
+        notes: notes.length,
+        streak: calculateStreak(focus)
+    };
+}
+
+function calculateStreak(focusSessions) {
+    const days = [...new Set(focusSessions.map(s => {
+        const d = new Date(s.created_at);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }))].sort((a, b) => b - a);
+    if (!days.length) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (Math.round((today.getTime() - days[0]) / MS_DAY) > 1) return 0;
+    let streak = 1;
+    for (let i = 0; i < days.length - 1; i += 1) {
+        if (Math.round((days[i] - days[i + 1]) / MS_DAY) === 1) streak += 1;
+        else break;
+    }
+    return streak;
+}
+
+function getDailyTotals(items) {
+    return items.reduce((days, session) => {
+        if (session.type !== "focus") return days;
+        const key = new Date(session.created_at).toLocaleDateString();
+        days[key] = (days[key] || 0) + Number(session.duration || 0);
+        return days;
+    }, {});
+}
+
+function renderData() {
+    const stats = calculateStats();
+    $("stat-today-minutes").textContent = minutesLabel(stats.todayMinutes);
+    $("stat-today-sessions").textContent = stats.todaySessions;
+    $("stat-today-tasks").textContent = stats.completedTasksToday;
+    $("stat-interruptions").textContent = stats.interruptions;
+    $("data-week-total").textContent = minutesLabel(stats.weekTotal);
+    $("data-month-total").textContent = minutesLabel(stats.monthTotal);
+    $("data-best-day").textContent = minutesLabel(stats.bestDay);
+    $("data-average-session").textContent = minutesLabel(stats.avgSession);
+    el.streakCount.textContent = stats.streak;
+    el.streakContainer.classList.toggle("hidden", stats.streak === 0);
+    renderGoal(stats);
+    renderHistory();
+    renderWeeklyChart();
+    renderHeatmap();
+    renderBadges(stats);
+}
+
+function renderGoal(stats) {
+    let current = stats.todayMinutes / 60;
+    let target = settings.dailyGoal;
+    let label = "Daily goal";
+    let suffix = "hrs";
+    if (settings.goalType === "sessions") {
+        current = stats.todaySessions;
+        label = "Session goal";
+        suffix = "sessions";
+    }
+    if (settings.goalType === "tasks") {
+        current = stats.completedTasksToday;
+        label = "Task goal";
+        suffix = "tasks";
+    }
+    el.goalLabel.textContent = label;
+    el.dailyGoalText.textContent = `${Number(current).toFixed(settings.goalType === "hours" ? 1 : 0)} / ${target} ${suffix}`;
+    el.dailyGoalProgress.style.width = `${Math.min((current / target) * 100, 100)}%`;
+}
+
+function renderHistory() {
+    el.historyList.replaceChildren();
+    if (!sessions.length) {
+        el.historyList.append(emptyItem("No sessions yet."));
+        return;
+    }
+    sessions.slice(0, 6).forEach(session => {
+        const item = document.createElement("li");
+        item.className = "history-item";
+        const main = document.createElement("div");
+        main.className = "history-main";
+        const title = document.createElement("span");
+        title.className = "type";
+        title.textContent = session.intention || session.taskText || "Focus session";
+        const meta = document.createElement("span");
+        meta.className = "history-meta";
+        meta.textContent = [session.taskText, session.note].filter(Boolean).join(" · ") || TEMPLATES[session.template]?.name || "Focus";
+        const time = document.createElement("span");
+        time.className = "time";
+        time.textContent = `${session.duration}m · ${new Date(session.created_at).toLocaleDateString()}`;
+        main.append(title, meta);
+        item.append(main, time);
+        el.historyList.append(item);
     });
-});
+}
 
-// --- Task List Logic ---
-let tasks = JSON.parse(localStorage.getItem('zen52_tasks')) || [];
+function renderWeeklyChart() {
+    el.weeklyChart.replaceChildren();
+    const totals = getDailyTotals(sessions);
+    const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const values = [];
+    for (let i = 6; i >= 0; i -= 1) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        values.push({ label: i === 0 ? "Today" : labels[d.getDay()], value: totals[d.toLocaleDateString()] || 0 });
+    }
+    const max = Math.max(...values.map(d => d.value), 60);
+    values.forEach(day => {
+        const wrap = document.createElement("div");
+        wrap.className = "bar-wrap";
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.height = `${Math.max(4, (day.value / max) * 160)}px`;
+        bar.title = `${day.label}: ${day.value} minutes`;
+        const label = document.createElement("span");
+        label.textContent = day.label;
+        wrap.append(bar, label);
+        el.weeklyChart.append(wrap);
+    });
+}
 
-function saveTasks() {
-    localStorage.setItem('zen52_tasks', JSON.stringify(tasks));
-    renderTasks();
+function renderHeatmap() {
+    el.heatmapGrid.replaceChildren();
+    const totals = getDailyTotals(sessions);
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - 364);
+    start.setDate(start.getDate() - start.getDay());
+    for (let i = 0; i < 53 * 7; i += 1) {
+        const current = new Date(start);
+        current.setDate(start.getDate() + i);
+        if (current > today) break;
+        const minutes = totals[current.toLocaleDateString()] || 0;
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        cell.dataset.level = minutes >= 120 ? 4 : minutes >= 60 ? 3 : minutes >= 30 ? 2 : minutes > 0 ? 1 : 0;
+        cell.title = `${current.toLocaleDateString()}: ${minutes} minutes`;
+        el.heatmapGrid.append(cell);
+    }
+}
+
+function renderBadges(stats) {
+    el.badgesGrid.replaceChildren();
+    BADGES.forEach(badge => {
+        const item = document.createElement("div");
+        item.className = `badge-item ${badge.unlocked(stats) ? "" : "locked"}`;
+        item.title = badge.name;
+        const icon = document.createElement("div");
+        icon.className = "badge-icon";
+        icon.textContent = badge.code;
+        const text = document.createElement("span");
+        text.textContent = badge.name;
+        item.append(icon, text);
+        el.badgesGrid.append(item);
+    });
+}
+
+function emptyItem(text) {
+    const item = document.createElement("li");
+    item.className = "loading-text";
+    item.textContent = text;
+    return item;
 }
 
 function renderTasks() {
-    taskListUl.innerHTML = '';
-    tasks.forEach((task, index) => {
-        const li = document.createElement('li');
-        li.className = 'task-item';
-        li.innerHTML = `
-            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
-            <span class="task-text">${task.text}</span>
-            <button class="task-delete"><i class="fa-solid fa-trash"></i></button>
-        `;
-
-        const checkbox = li.querySelector('.task-checkbox');
-        checkbox.addEventListener('change', () => {
-            tasks[index].completed = checkbox.checked;
-            saveTasks();
+    el.taskList.replaceChildren();
+    if (!tasks.length) {
+        el.taskList.append(emptyItem("No active tasks."));
+        return;
+    }
+    tasks.forEach(task => {
+        const item = document.createElement("li");
+        item.className = "task-item";
+        const checkbox = document.createElement("input");
+        checkbox.className = "task-checkbox";
+        checkbox.type = "checkbox";
+        checkbox.checked = Boolean(task.completed);
+        checkbox.addEventListener("change", () => {
+            task.completed = checkbox.checked;
+            task.completedAt = checkbox.checked ? new Date().toISOString() : null;
+            saveAll();
+            renderTasks();
+            renderData();
         });
-
-        const deleteBtn = li.querySelector('.task-delete');
-        deleteBtn.addEventListener('click', () => {
-            tasks.splice(index, 1);
-            saveTasks();
+        const text = document.createElement("span");
+        text.className = "task-text";
+        text.textContent = task.text;
+        const link = document.createElement("button");
+        link.className = `task-link ${settings.selectedTaskId === task.id ? "active" : ""}`;
+        link.type = "button";
+        link.textContent = settings.selectedTaskId === task.id ? "linked" : "link";
+        link.addEventListener("click", () => {
+            settings.selectedTaskId = settings.selectedTaskId === task.id ? null : task.id;
+            saveAll();
+            renderTasks();
+            updateDisplay();
         });
+        const del = document.createElement("button");
+        del.className = "task-delete";
+        del.type = "button";
+        del.textContent = "×";
+        del.addEventListener("click", () => {
+            tasks = tasks.filter(t => t.id !== task.id);
+            if (settings.selectedTaskId === task.id) settings.selectedTaskId = null;
+            saveAll();
+            renderTasks();
+            renderData();
+            updateDisplay();
+        });
+        item.append(checkbox, text, link, del);
+        el.taskList.append(item);
+    });
+}
 
-        taskListUl.appendChild(li);
+function parseTimePeriods(value) {
+    return String(value || "")
+        .split(/[,\s]+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .map(part => {
+            const match = part.match(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/);
+            if (!match) return null;
+            const start = Number(match[1]) * 60 + Number(match[2]);
+            const end = Number(match[3]) * 60 + Number(match[4]);
+            return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null;
+        })
+        .filter(Boolean);
+}
+
+function isWithinPeriod(period, minutes) {
+    if (period.start <= period.end) return minutes >= period.start && minutes < period.end;
+    return minutes >= period.start || minutes < period.end;
+}
+
+function activeBlockSets(date = new Date()) {
+    const mins = date.getHours() * 60 + date.getMinutes();
+    const lockdown = Number(settings.lockdownUntil || 0) > Date.now();
+    return blockSets.filter(set => {
+        if (lockdown) return true;
+        if (set.overrideUntil && set.overrideUntil > Date.now()) return false;
+        const periods = parseTimePeriods(set.times);
+        const scheduled = periods.length ? periods.some(period => isWithinPeriod(period, mins)) : isFocusMode && isRunning;
+        return scheduled;
+    });
+}
+
+function renderBlockSets() {
+    const active = activeBlockSets();
+    el.guardrailStatus.textContent = active.length
+        ? `Active guardrails: ${active.map(set => set.name).join(", ")}`
+        : "No guardrails active right now.";
+    el.blocksetList.replaceChildren();
+    if (!blockSets.length) {
+        const empty = document.createElement("li");
+        empty.className = "loading-text";
+        empty.textContent = "No block sets yet.";
+        el.blocksetList.append(empty);
+        return;
+    }
+    blockSets.forEach(set => {
+        const item = document.createElement("li");
+        item.className = `blockset-item ${active.some(activeSet => activeSet.id === set.id) ? "active" : ""}`;
+        const header = document.createElement("header");
+        const title = document.createElement("strong");
+        title.textContent = set.name;
+        const limit = document.createElement("small");
+        limit.textContent = set.limit ? `${set.limit}m budget` : "no budget";
+        header.append(title, limit);
+        const sites = document.createElement("small");
+        sites.textContent = set.sites.join(", ");
+        const schedule = document.createElement("small");
+        schedule.textContent = set.times ? `Schedule ${set.times}` : "Active during focus sessions";
+        const actions = document.createElement("div");
+        actions.className = "blockset-actions";
+        const override = document.createElement("button");
+        override.type = "button";
+        override.textContent = set.delay ? `Override ${set.delay}s` : "Override";
+        override.addEventListener("click", () => {
+            const run = () => {
+                set.overrideUntil = Date.now() + 10 * 60 * 1000;
+                saveAll();
+                renderBlockSets();
+                updateDisplay();
+            };
+            if (set.delay) {
+                override.disabled = true;
+                let left = set.delay;
+                override.textContent = `${left}s`;
+                const id = setInterval(() => {
+                    left -= 1;
+                    override.textContent = `${left}s`;
+                    if (left <= 0) {
+                        clearInterval(id);
+                        run();
+                    }
+                }, 1000);
+            } else {
+                run();
+            }
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () => {
+            blockSets = blockSets.filter(itemSet => itemSet.id !== set.id);
+            saveAll();
+            renderBlockSets();
+            updateDisplay();
+        });
+        actions.append(override, remove);
+        item.append(header, sites, schedule, actions);
+        el.blocksetList.append(item);
     });
 }
 
 function addTask() {
-    const text = taskInput.value.trim();
-    if (text) {
-        tasks.push({ text, completed: false });
-        taskInput.value = '';
-        saveTasks();
-    }
+    const text = el.taskInput.value.trim();
+    if (!text) return;
+    const task = { id: Date.now(), text, completed: false, createdAt: new Date().toISOString(), completedAt: null };
+    tasks.push(task);
+    settings.selectedTaskId = task.id;
+    el.taskInput.value = "";
+    saveAll();
+    renderTasks();
+    updateDisplay();
 }
 
-addTaskBtn.addEventListener('click', addTask);
-taskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addTask();
-});
-
-// --- Keyboard Shortcuts ---
-document.addEventListener('keydown', (e) => {
-    // Ignore shortcuts if typing in input or textarea
-    const activeElement = document.activeElement;
-    const isTyping = activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA';
-
-    if (isTyping) return;
-
-    if (e.code === 'Space') {
-        e.preventDefault(); // Prevent scrolling
-        if (isRunning) pauseTimer();
-        else startTimer();
-    }
-
-    if (e.key.toLowerCase() === 'r') {
-        resetTimer();
-    }
-
-    if (e.key.toLowerCase() === 'm') {
-        toggleMute();
-    }
-});
-
-// History Logic
-function fetchHistory() {
-    // 1. Load from Local Variable (which is synced with localStorage)
-    const sessions = localSessions;
-
-    // 2. Render
-    renderHistory(sessions);
-    renderChart(sessions);
-
-    // 3. Logic
-    const streak = checkBadges(sessions);
-    if (streak > 0) {
-        streakCountDisplay.textContent = streak;
-        streakContainer.classList.remove('hidden');
-    } else {
-        streakContainer.classList.add('hidden');
-    }
-
-    updateDailyGoal(sessions);
-}
-
-// --- Data Backup & Restore ---
-const exportBtn = document.getElementById('export-data-btn');
-const importBtn = document.getElementById('import-data-btn');
-const importInput = document.getElementById('import-file-input');
-
-if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-        const data = {
-            sessions: JSON.parse(localStorage.getItem('zen52_sessions') || '[]'),
-            tasks: JSON.parse(localStorage.getItem('zen52_tasks') || '[]'),
-            settings: {
-                focus: localStorage.getItem('zen52_focus_time'),
-                break: localStorage.getItem('zen52_break_time'),
-                theme: localStorage.getItem('zen52_theme')
-            }
-        };
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `zen52_backup_${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+function renderRoutines() {
+    el.routineList.replaceChildren();
+    BREAK_ROUTINES.forEach(routine => {
+        const item = document.createElement("button");
+        item.className = `routine-item ${settings.activeRoutine === routine.id ? "active" : ""}`;
+        item.type = "button";
+        item.innerHTML = `<span>${routine.name}</span><small>${routine.text}</small>`;
+        item.addEventListener("click", () => {
+            settings.activeRoutine = routine.id;
+            saveAll();
+            renderRoutines();
+        });
+        el.routineList.append(item);
     });
 }
 
-if (importBtn) {
-    importBtn.addEventListener('click', () => importInput.click());
-
-    importInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const data = JSON.parse(event.target.result);
-
-                // Restore
-                if (data.sessions) localStorage.setItem('zen52_sessions', JSON.stringify(data.sessions));
-                if (data.tasks) localStorage.setItem('zen52_tasks', JSON.stringify(data.tasks));
-                if (data.settings) {
-                    if (data.settings.focus) localStorage.setItem('zen52_focus_time', data.settings.focus);
-                    if (data.settings.break) localStorage.setItem('zen52_break_time', data.settings.break);
-                    if (data.settings.theme) localStorage.setItem('zen52_theme', data.settings.theme);
-                }
-
-                alert('Data imported successfully! Reloading...');
-                location.reload();
-            } catch (err) {
-                alert('Invalid backup file.');
-            }
-        };
-        reader.readAsText(file);
-    });
+function showBreakModal() {
+    const routine = BREAK_ROUTINES.find(item => item.id === settings.activeRoutine) || BREAK_ROUTINES[0];
+    el.breakSuggestion.textContent = routine.text;
+    el.breathing.classList.add("hidden");
+    el.startBreathing.classList.toggle("hidden", routine.id !== "breathe");
+    el.breakModal.showModal();
 }
 
-function renderHistory(sessions) {
-    historyList.innerHTML = '';
-    // Show top 5 recent in list
-    const recentSessions = sessions.slice(0, 5);
-
-    if (recentSessions.length === 0) {
-        historyList.innerHTML = '<li class="loading-text">No recent sessions found.</li>';
+function renderJournal(query = "") {
+    const q = query.toLowerCase();
+    el.journalList.replaceChildren();
+    const rows = sessions.filter(session => {
+        const haystack = [session.intention, session.taskText, session.note, TEMPLATES[session.template]?.name].join(" ").toLowerCase();
+        return haystack.includes(q);
+    });
+    if (!rows.length) {
+        const empty = document.createElement("div");
+        empty.className = "journal-item";
+        empty.textContent = "No journal entries found.";
+        el.journalList.append(empty);
         return;
     }
-    recentSessions.forEach(session => {
-        const date = new Date(session.created_at).toLocaleDateString();
-        const li = document.createElement('li');
-        li.className = 'history-item';
-        li.innerHTML = `
-            <span class="type">${session.type === 'focus' ? 'Focus Session' : 'Break'}</span>
-            <span class="time">${session.duration}m &middot; ${date}</span>
-        `;
-        historyList.appendChild(li);
+    rows.forEach(session => {
+        const item = document.createElement("div");
+        item.className = "journal-item";
+        const title = document.createElement("strong");
+        title.textContent = session.intention || session.taskText || "Focus session";
+        const meta = document.createElement("small");
+        meta.textContent = `${session.duration}m · ${new Date(session.created_at).toLocaleString()} · ${TEMPLATES[session.template]?.name || "Custom"}`;
+        const note = document.createElement("span");
+        note.textContent = session.note || "No note saved.";
+        item.append(title, meta, note);
+        el.journalList.append(item);
     });
 }
 
-// --- Chart Logic ---
-let focusChart = null;
+function commands() {
+    return [
+        { name: isRunning ? "Pause timer" : "Start timer", hint: "Space", action: () => (isRunning ? pauseTimer() : startTimer()) },
+        { name: "Reset timer", hint: "R", action: resetTimer },
+        { name: "Toggle Zen mode", hint: "Fullscreen focus", action: toggleZen },
+        { name: "Switch theme", hint: "Dark / light", action: toggleTheme },
+        { name: "Open journal", hint: "Search sessions", action: () => openJournal() },
+        { name: "Export data", hint: "Local backup", action: exportData },
+        { name: "Start lockdown", hint: "Activate all block sets", action: startLockdown },
+        { name: "Pomodoro preset", hint: "25/5", action: () => applyTemplate("pomodoro") },
+        { name: "Zen52 preset", hint: "52/17", action: () => applyTemplate("zen52") },
+        { name: "Deep Work preset", hint: "90/15", action: () => applyTemplate("deep") }
+    ];
+}
 
-function renderChart(sessions) {
-    if (typeof renderHeatmap === 'function') renderHeatmap(sessions);
-    const ctx = document.getElementById('weekly-chart');
-    if (!ctx) return;
-
-    // Group by Date for the last 7 days
-    const dailyTotals = {};
-    sessions.forEach(session => {
-        if (session.type === 'focus') {
-            // Normalize date to string (local locale)
-            const dateStr = new Date(session.created_at).toLocaleDateString();
-            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
-        }
-    });
-
-    const labels = [];
-    const data = [];
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toLocaleDateString();
-        const dayName = i === 0 ? 'Today' : days[d.getDay()];
-
-        labels.push(dayName);
-        data.push(dailyTotals[dateStr] || 0);
-    }
-
-    if (focusChart) {
-        focusChart.destroy();
-    }
-
-    // Chart.js requires script tag in html, assumed present
-    if (typeof Chart !== 'undefined') {
-        focusChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Focus Minutes',
-                    data: data,
-                    backgroundColor: '#238636',
-                    borderRadius: 4,
-                    hoverBackgroundColor: '#2ea043'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#30363d' },
-                        ticks: { color: '#8b949e' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#8b949e' }
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
+function renderCommands(query = "") {
+    const q = query.toLowerCase();
+    el.commandList.replaceChildren();
+    commands().filter(cmd => cmd.name.toLowerCase().includes(q) || cmd.hint.toLowerCase().includes(q)).forEach(cmd => {
+        const item = document.createElement("button");
+        item.className = "command-item";
+        item.type = "button";
+        item.innerHTML = `<strong>${cmd.name}</strong><small>${cmd.hint}</small>`;
+        item.addEventListener("click", () => {
+            el.commandModal.close();
+            cmd.action();
         });
-    }
+        el.commandList.append(item);
+    });
 }
 
-// --- Heatmap Logic ---
-function renderHeatmap(sessions) {
-    const grid = document.getElementById('heatmap-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
+function openCommand() {
+    renderCommands();
+    el.commandModal.showModal();
+    setTimeout(() => el.commandSearch.focus(), 50);
+}
 
-    // Calculate daily totals for last 365 days
-    const dailyTotals = {};
-    sessions.forEach(session => {
-        if (session.type === 'focus') {
-            const dateStr = new Date(session.created_at).toLocaleDateString();
-            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
+function openJournal() {
+    renderJournal();
+    el.journalModal.showModal();
+    setTimeout(() => el.journalSearch.focus(), 50);
+}
+
+function toggleTheme() {
+    const isLight = document.body.classList.toggle("light-mode");
+    el.theme.querySelector("span").textContent = isLight ? "☾" : "☼";
+    localStorage.setItem("zen52_theme", isLight ? "light" : "dark");
+}
+
+function toggleZen(force) {
+    const enabled = typeof force === "boolean" ? force : !document.body.classList.contains("zen-mode");
+    document.body.classList.toggle("zen-mode", enabled);
+    el.zenExit.classList.toggle("hidden", !enabled);
+}
+
+function updateCycleIndicator() {
+    document.querySelectorAll(".cycle-dot").forEach((dot, index) => {
+        dot.classList.toggle("completed", index < settings.currentSession - 1);
+        dot.classList.toggle("active", index === Math.min(settings.currentSession, 4) - 1);
+    });
+    $("cycle-label").textContent = `Session ${Math.min(settings.currentSession, 4)}/4`;
+}
+
+function exportData() {
+    const data = { sessions, tasks, notes, blockSets, interruptions, settings, scratchpad: localStorage.getItem("zen52_scratchpad") || "" };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `zen52_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    settings.lastBackupAt = new Date().toISOString();
+    saveAll();
+    checkBackupReminder();
+}
+
+function importData(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(reader.result);
+            sessions = Array.isArray(data.sessions) ? data.sessions : sessions;
+            tasks = Array.isArray(data.tasks) ? data.tasks : tasks;
+            notes = Array.isArray(data.notes) ? data.notes : notes;
+            blockSets = Array.isArray(data.blockSets) ? data.blockSets : Array.isArray(data.blockers) ? data.blockers.map(name => ({ id: Date.now() + Math.random(), name, sites: [name], times: "", limit: 0, delay: 0 })) : blockSets;
+            interruptions = Array.isArray(data.interruptions) ? data.interruptions : interruptions;
+            settings = { ...settings, ...(data.settings || {}) };
+            if (typeof data.scratchpad === "string") localStorage.setItem("zen52_scratchpad", data.scratchpad);
+            saveAll();
+            location.reload();
+        } catch {
+            alert("Invalid backup file.");
         }
-    });
-
-    // Generate last ~52 weeks (approx 364 days to keep grid clean 7x52)
-    const today = new Date();
-    // Start date: 52 weeks ago (aligned to Sunday if we want standard calendar, but simplify for now)
-    // Actually, let's just do 52 columns * 7 rows = 364 squares
-    // We render backwards or forwards? Usually columns are weeks.
-
-    // We need 52 colums. Each column 7 rows (Sun-Sat).
-    // Let's iterate weeks, then days.
-
-    // Determine start date: Today minus 364 days?
-    // Let's just create 365 divs? CSS grid-auto-flow: column handles the wrapping if we fix rows to 7.
-    // We need to order them correctly. grid-auto-flow: column fills col 1 (row1...7), then col 2.
-    // So we just need to push days in chronological order.
-
-    const startDate = new Date();
-    startDate.setDate(today.getDate() - 364);
-    // Adjustment to align start date to a Sunday?
-    // If we indiscriminately push days, and the first day is Wednesday, it will appear as Sunday (row 1).
-    // To align correctly: calculate offset to previous Sunday.
-    const dayOfWeek = startDate.getDay(); // 0 (Sun) to 6 (Sat)
-    startDate.setDate(startDate.getDate() - dayOfWeek); // Go back to Sunday
-
-    // Now loop for 53 weeks * 7 days to cover full width or until Today
-    const oneYearFromStart = new Date(today); // cap it?
-
-    // Let's render 53 weeks
-    for (let i = 0; i < 53 * 7; i++) {
-        const current = new Date(startDate);
-        current.setDate(startDate.getDate() + i);
-
-        if (current > today) break; // Don't show future? Or fill with empty.
-
-        const dateStr = current.toLocaleDateString();
-        const minutes = dailyTotals[dateStr] || 0;
-
-        let level = 0;
-        if (minutes > 0) level = 1;
-        if (minutes >= 30) level = 2;
-        if (minutes >= 60) level = 3;
-        if (minutes >= 120) level = 4;
-
-        const cell = document.createElement('div');
-        cell.className = 'heatmap-cell';
-        cell.dataset.level = level;
-        cell.title = `${dateStr}: ${minutes} mins`;
-        grid.appendChild(cell);
-    }
+    };
+    reader.readAsText(file);
 }
 
-// Chart Toggling
-const chartToggleBtn = document.getElementById('chart-toggle-btn');
-const chartContainer = document.getElementById('chart-container');
-const heatmapContainer = document.getElementById('heatmap-container');
-
-if (chartToggleBtn) {
-    // Load pref - DEFAULT TO HEATMAP
-    const pref = localStorage.getItem('zen52_chart_pref') || 'heatmap';
-    if (pref === 'heatmap') {
-        chartContainer.classList.add('hidden');
-        heatmapContainer.classList.remove('hidden');
-        chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
-    }
-
-    chartToggleBtn.addEventListener('click', () => {
-        const isBar = !chartContainer.classList.contains('hidden');
-        if (isBar) {
-            // Switch to Heatmap
-            chartContainer.classList.add('hidden');
-            heatmapContainer.classList.remove('hidden');
-            chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
-            localStorage.setItem('zen52_chart_pref', 'heatmap');
-        } else {
-            // Switch to Bar
-            heatmapContainer.classList.add('hidden');
-            chartContainer.classList.remove('hidden');
-            chartToggleBtn.querySelector('i').classList.replace('fa-border-all', 'fa-chart-simple');
-            localStorage.setItem('zen52_chart_pref', 'bar');
-        }
-    });
+function checkBackupReminder() {
+    const last = settings.lastBackupAt ? new Date(settings.lastBackupAt) : null;
+    const shouldShow = sessions.length >= 5 && (!last || Date.now() - last.getTime() > 21 * MS_DAY);
+    el.backupReminder.classList.toggle("hidden", !shouldShow);
 }
 
-// Hook into fetchHistory to render heatmap
-const originalFetchHistory = fetchHistory; // Wait, I can just append to the function body via replace... 
-// But I am rewriting the end of the file or specific logic? 
-// The tool I'm using replaces a block.
-// I replaced renderChart logic above. I should ensure renderHeatmap is CALLED.
-// Let's modify the fetchHistory function or helper.
-// Actually, I can just call renderHeatmap(sessions) inside renderChart? No, different responsibility.
-// Let's update renderChart to also call renderHeatmap or update fetchHistory.
-// Since I am replacing the renderChart function definition above, I can't easily hook there.
-// I will just add renderHeatmap(sessions) to the end of renderChart? 
-// No, better to update fetchHistory. But I am replacing the end of the file.
-
-// Let's just update renderChart to ALWAYS update the heatmap data too, since they share the same sessions data.
-// That way fetchHistory calls renderChart -> renderChart updates both visuals.
-// Efficient enough for now.
-
-// Wait, looking at the ReplacementContent above... I am defining renderHeatmap but NOT calling it.
-// I will rewrite renderChart above to call renderHeatmap(sessions) at start or end.
-
-// RE-WRITING RenderChart start to include heatmap call:
-/*
-function renderChart(sessions) {
-    renderHeatmap(sessions); // <--- Added
-    const ctx = document.getElementById('weekly-chart');
-...
-*/
-
-// --- Scratchpad Logic ---
-if (scratchpad) {
-    // Load
-    scratchpad.value = localStorage.getItem('zen52_scratchpad') || '';
-
-    // Save
-    scratchpad.addEventListener('input', () => {
-        localStorage.setItem('zen52_scratchpad', scratchpad.value);
+function addBlockSet() {
+    const sites = el.blocksetSitesInput.value
+        .split(/\n+/)
+        .map(site => site.trim())
+        .filter(Boolean);
+    if (!sites.length) return;
+    blockSets.push({
+        id: Date.now(),
+        name: el.blocksetNameInput.value.trim() || "Focus block",
+        sites,
+        times: el.blocksetTimesInput.value.trim(),
+        limit: Number(el.blocksetLimitInput.value) || 0,
+        delay: Number(el.blocksetDelayInput.value) || 0,
+        overrideUntil: 0
     });
+    el.blocksetNameInput.value = "";
+    el.blocksetSitesInput.value = "";
+    el.blocksetTimesInput.value = "";
+    el.blocksetLimitInput.value = "";
+    el.blocksetDelayInput.value = "";
+    saveAll();
+    renderBlockSets();
+    updateDisplay();
 }
 
-// Clear Scratchpad Button
-const clearScratchpadBtn = document.getElementById('clear-scratchpad-btn');
-if (clearScratchpadBtn) {
-    clearScratchpadBtn.addEventListener('click', () => {
-        if (confirm('Clear all Brain Dump notes?')) {
-            scratchpad.value = '';
-            localStorage.setItem('zen52_scratchpad', '');
-        }
-    });
+function startLockdown() {
+    const mins = Number(el.lockdownMinsInput?.value || 25);
+    settings.lockdownUntil = Date.now() + Math.max(1, mins) * 60 * 1000;
+    saveAll();
+    renderBlockSets();
+    updateDisplay();
 }
 
-// --- Shortcuts Modal Logic ---
-if (shortcutsBtn) {
-    shortcutsBtn.addEventListener('click', () => shortcutsModal.showModal());
-    closeShortcutsBtn.addEventListener('click', () => shortcutsModal.close());
-    // Close on backdrop click
-    shortcutsModal.addEventListener('click', (e) => {
-        if (e.target === shortcutsModal) shortcutsModal.close();
-    });
+function getAudioContext() {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return audioContext;
 }
 
-// --- Session Notes Modal Logic ---
-const sessionNotesModal = document.getElementById('session-notes-modal');
-const sessionNoteInput = document.getElementById('session-note-input');
-const saveNoteBtn = document.getElementById('save-note-btn');
-const skipNoteBtn = document.getElementById('skip-note-btn');
-
-if (saveNoteBtn) {
-    saveNoteBtn.addEventListener('click', () => {
-        const note = sessionNoteInput.value.trim();
-        if (note) {
-            // Save note to localStorage with timestamp
-            const sessionNotes = JSON.parse(localStorage.getItem('zen52_session_notes') || '[]');
-            sessionNotes.unshift({
-                note: note,
-                timestamp: new Date().toISOString(),
-                duration: Math.floor(focusDuration / 60)
-            });
-            // Keep only last 50 notes
-            localStorage.setItem('zen52_session_notes', JSON.stringify(sessionNotes.slice(0, 50)));
-        }
-        sessionNoteInput.value = '';
-        sessionNotesModal.close();
-    });
+function makeNoiseBuffer(ctx) {
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    return buffer;
 }
 
-if (skipNoteBtn) {
-    skipNoteBtn.addEventListener('click', () => {
-        sessionNoteInput.value = '';
-        sessionNotesModal.close();
-    });
+function startAmbience(type, volume) {
+    const ctx = getAudioContext();
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    const source = ctx.createBufferSource();
+    source.buffer = makeNoiseBuffer(ctx);
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type === "rain" ? "highpass" : "lowpass";
+    filter.frequency.value = type === "rain" ? 900 : type === "forest" ? 520 : 360;
+    source.connect(filter).connect(gain).connect(ctx.destination);
+    source.start();
+    ambience.set(type, { source, gain });
 }
 
-// --- Break Modal Logic ---
-const breakModal = document.getElementById('break-modal');
-const closeBreakBtn = document.getElementById('close-break-btn');
-const startBreathingBtn = document.getElementById('start-breathing-btn');
-const breathingExercise = document.getElementById('breathing-exercise');
-const breathInstruction = document.getElementById('breath-instruction');
-
-if (closeBreakBtn) {
-    closeBreakBtn.addEventListener('click', () => {
-        breakModal.close();
-        if (breathingExercise) breathingExercise.classList.add('hidden');
-    });
+function stopAmbience(type) {
+    const item = ambience.get(type);
+    if (!item) return;
+    item.source.stop();
+    ambience.delete(type);
 }
 
-if (startBreathingBtn) {
-    startBreathingBtn.addEventListener('click', () => {
-        breathingExercise.classList.remove('hidden');
-        startBreathingBtn.classList.add('hidden');
-
-        // 4-7-8 Breathing cycle
-        const phases = [
-            { text: "Breathe in...", duration: 4000 },
-            { text: "Hold...", duration: 7000 },
-            { text: "Breathe out...", duration: 8000 }
-        ];
-
-        let phaseIndex = 0;
-        let cycles = 0;
-
-        function runPhase() {
-            if (cycles >= 3) {
-                breathInstruction.textContent = "Great job! 🌟";
-                setTimeout(() => {
-                    breathingExercise.classList.add('hidden');
-                    startBreathingBtn.classList.remove('hidden');
-                }, 2000);
-                return;
-            }
-
-            breathInstruction.textContent = phases[phaseIndex].text;
-
-            setTimeout(() => {
-                phaseIndex++;
-                if (phaseIndex >= phases.length) {
-                    phaseIndex = 0;
-                    cycles++;
-                }
-                runPhase();
-            }, phases[phaseIndex].duration);
-        }
-
-        runPhase();
-    });
-}
-
-// Initialize cycle indicator on load
-updateCycleIndicator();
-
-// --- Mute Logic Helper ---
 function toggleMute() {
-    let anyMuted = false;
-    // Check if any active sound is muted (simplified: just toggle all based on first)
-    // Actually, let's just mute/unmute all Audio elements
-    const audios = document.querySelectorAll('audio'); // We created them dynamically? No, we need to grab them.
-    // Wait, we don't have audio tags, we create new Audio() objects in startTimer? 
-    // Ah, ambient sounds uses <audio> tags? No, the code says:  const audio = document.getElementById(`audio-${soundType}`);
-    // So there ARE audio tags in HTML.
-
-    const allAudios = document.querySelectorAll('audio');
-    let allMuted = true;
-    allAudios.forEach(a => {
-        if (!a.muted) allMuted = false;
+    if (!ambience.size) return;
+    const shouldMute = [...ambience.values()].some(item => item.gain.gain.value > 0);
+    ambience.forEach((item, type) => {
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        item.gain.gain.value = shouldMute ? 0 : Number(slider?.value || 0.4);
     });
-
-    const newState = !allMuted;
-    allAudios.forEach(a => {
-        a.muted = newState;
-    });
-
-    triggerNotification(newState ? "Muted" : "Unmuted", "All sounds audio toggled.");
 }
 
-// Initial Init
-updateDisplay();
-fetchHistory();
-renderTasks();
-showRandomQuote();
+function saveSoundProfile() {
+    settings.soundProfile = {
+        active: [...ambience.keys()],
+        volumes: Object.fromEntries([...document.querySelectorAll(".volume-slider")].map(slider => [slider.dataset.sound, Number(slider.value)]))
+    };
+    saveAll();
+}
 
+function loadSoundProfile() {
+    if (!settings.soundProfile) return;
+    document.querySelectorAll(".sound-btn").forEach(btn => {
+        if (ambience.has(btn.dataset.sound)) stopAmbience(btn.dataset.sound);
+        btn.classList.remove("active");
+    });
+    Object.entries(settings.soundProfile.volumes || {}).forEach(([type, value]) => {
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        if (slider) slider.value = value;
+    });
+    (settings.soundProfile.active || []).forEach(type => {
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        const btn = document.querySelector(`.sound-btn[data-sound="${type}"]`);
+        startAmbience(type, Number(slider?.value || 0.4));
+        btn?.classList.add("active");
+    });
+}
+
+function registerServiceWorker() {
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+}
+
+function bindEvents() {
+    el.start.addEventListener("click", () => isRunning ? pauseTimer() : startTimer());
+    el.reset.addEventListener("click", resetTimer);
+    el.zenToggle.addEventListener("click", () => toggleZen());
+    el.zenExit.addEventListener("click", () => toggleZen(false));
+    el.theme.addEventListener("click", toggleTheme);
+    el.commandBtn.addEventListener("click", openCommand);
+    el.commandSearch.addEventListener("input", () => renderCommands(el.commandSearch.value));
+    el.closeCommand.addEventListener("click", () => el.commandModal.close());
+    el.settingsBtn.addEventListener("click", () => {
+        el.focusInput.value = Math.floor(settings.focus / 60);
+        el.breakInput.value = Math.floor(settings.break / 60);
+        el.goalInput.value = settings.dailyGoal;
+        el.goalTypeInput.value = settings.goalType;
+        el.autoStartBreakInput.checked = settings.autoStartBreak;
+        el.autoStartFocusInput.checked = settings.autoStartFocus;
+        el.syncEnabledInput.checked = settings.syncEnabled;
+        el.settingsModal.showModal();
+    });
+    el.closeSettings.addEventListener("click", () => el.settingsModal.close());
+    el.saveSettings.addEventListener("click", () => {
+        if (!applyCustomDurations(Number(el.focusInput.value), Number(el.breakInput.value))) return;
+        settings.dailyGoal = Number(el.goalInput.value) || 4;
+        settings.goalType = el.goalTypeInput.value;
+        settings.autoStartBreak = el.autoStartBreakInput.checked;
+        settings.autoStartFocus = el.autoStartFocusInput.checked;
+        settings.syncEnabled = el.syncEnabledInput.checked;
+        saveAll();
+        renderData();
+        el.settingsModal.close();
+    });
+    document.querySelectorAll(".preset-chip[data-template]").forEach(btn => btn.addEventListener("click", () => applyTemplate(btn.dataset.template)));
+    el.customBtn.addEventListener("click", () => {
+        el.customInput.classList.toggle("hidden");
+        el.quickFocus.value = Math.floor(settings.focus / 60);
+        el.quickBreak.value = Math.floor(settings.break / 60);
+    });
+    el.applyCustom.addEventListener("click", () => {
+        if (applyCustomDurations(Number(el.quickFocus.value), Number(el.quickBreak.value))) el.customInput.classList.add("hidden");
+    });
+    el.addTask.addEventListener("click", addTask);
+    el.taskInput.addEventListener("keydown", e => { if (e.key === "Enter") addTask(); });
+    el.clearCompleted.addEventListener("click", () => {
+        tasks = tasks.filter(task => !task.completed);
+        saveAll();
+        renderTasks();
+        renderData();
+    });
+    el.intention.addEventListener("input", () => {
+        settings.currentIntention = el.intention.value;
+        saveAll();
+    });
+    el.chartToggle.addEventListener("click", () => {
+        const showBars = el.chartContainer.classList.contains("hidden");
+        el.chartContainer.classList.toggle("hidden", !showBars);
+        el.heatmapContainer.classList.toggle("hidden", showBars);
+        localStorage.setItem("zen52_chart_pref", showBars ? "bar" : "heatmap");
+    });
+    document.querySelectorAll(".sound-btn").forEach(btn => btn.addEventListener("click", () => {
+        const type = btn.dataset.sound;
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        if (ambience.has(type)) {
+            stopAmbience(type);
+            btn.classList.remove("active");
+        } else {
+            startAmbience(type, Number(slider?.value || 0.4));
+            btn.classList.add("active");
+        }
+    }));
+    document.querySelectorAll(".volume-slider").forEach(slider => slider.addEventListener("input", () => {
+        const item = ambience.get(slider.dataset.sound);
+        if (item) item.gain.gain.value = Number(slider.value);
+    }));
+    $("save-sound-profile-btn").addEventListener("click", saveSoundProfile);
+    $("load-sound-profile-btn").addEventListener("click", loadSoundProfile);
+    el.scratchpad.value = localStorage.getItem("zen52_scratchpad") || "";
+    el.scratchpad.addEventListener("input", () => localStorage.setItem("zen52_scratchpad", el.scratchpad.value));
+    el.clearScratchpad.addEventListener("click", () => {
+        if (!el.scratchpad.value || confirm("Clear all brain dump notes?")) {
+            el.scratchpad.value = "";
+            localStorage.setItem("zen52_scratchpad", "");
+        }
+    });
+    el.addBlockset.addEventListener("click", addBlockSet);
+    el.lockdown.addEventListener("click", startLockdown);
+    el.exportData.addEventListener("click", exportData);
+    el.importData.addEventListener("click", () => el.importInput.click());
+    el.importInput.addEventListener("change", e => e.target.files[0] && importData(e.target.files[0]));
+    el.backupNow.addEventListener("click", exportData);
+    el.backupDismiss.addEventListener("click", () => {
+        settings.lastBackupAt = new Date().toISOString();
+        saveAll();
+        checkBackupReminder();
+    });
+    el.shortcutsBtn.addEventListener("click", () => el.shortcutsModal.showModal());
+    el.closeShortcuts.addEventListener("click", () => el.shortcutsModal.close());
+    el.openJournal.addEventListener("click", openJournal);
+    el.closeJournal.addEventListener("click", () => el.journalModal.close());
+    el.journalSearch.addEventListener("input", () => renderJournal(el.journalSearch.value));
+    el.saveNote.addEventListener("click", saveCurrentNote);
+    el.skipNote.addEventListener("click", () => el.notesModal.close());
+    el.markTaskDone.addEventListener("click", markLinkedTaskDone);
+    el.closeBreak.addEventListener("click", () => el.breakModal.close());
+    el.startBreathing.addEventListener("click", runBreathing);
+    [el.settingsModal, el.shortcutsModal, el.commandModal, el.notesModal, el.breakModal, el.journalModal].forEach(modal => {
+        modal.addEventListener("click", event => { if (event.target === modal) modal.close(); });
+    });
+    document.addEventListener("keydown", event => {
+        const active = document.activeElement;
+        const isTyping = active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName);
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+            event.preventDefault();
+            openCommand();
+            return;
+        }
+        if (isTyping) return;
+        if (event.code === "Space") { event.preventDefault(); isRunning ? pauseTimer() : startTimer(); }
+        if (event.key.toLowerCase() === "r") resetTimer();
+        if (event.key.toLowerCase() === "m") toggleMute();
+        if (event.key === "Escape" && document.body.classList.contains("zen-mode")) toggleZen(false);
+    });
+}
+
+function saveCurrentNote() {
+    const note = el.sessionNoteInput.value.trim();
+    const session = sessions.find(s => s.id === lastCompletedSessionId);
+    if (session && note) session.note = note;
+    if (note) notes.unshift({ id: Date.now(), sessionId: lastCompletedSessionId, note, timestamp: new Date().toISOString() });
+    el.sessionNoteInput.value = "";
+    saveAll();
+    renderData();
+    el.notesModal.close();
+}
+
+function markLinkedTaskDone() {
+    const session = sessions.find(s => s.id === lastCompletedSessionId);
+    const task = tasks.find(t => t.id === (session?.taskId || settings.selectedTaskId));
+    if (task) {
+        task.completed = true;
+        task.completedAt = new Date().toISOString();
+        saveAll();
+        renderTasks();
+        renderData();
+    }
+}
+
+function runBreathing() {
+    el.breathing.classList.remove("hidden");
+    el.startBreathing.classList.add("hidden");
+    const phases = [
+        { text: "Breathe in...", duration: 4000 },
+        { text: "Hold...", duration: 7000 },
+        { text: "Breathe out...", duration: 8000 }
+    ];
+    let phase = 0;
+    let cycles = 0;
+    function next() {
+        if (!el.breakModal.open || cycles >= 3) {
+            el.breathInstruction.textContent = "Done.";
+            el.startBreathing.classList.remove("hidden");
+            return;
+        }
+        el.breathInstruction.textContent = phases[phase].text;
+        setTimeout(() => {
+            phase += 1;
+            if (phase >= phases.length) {
+                phase = 0;
+                cycles += 1;
+            }
+            next();
+        }, phases[phase].duration);
+    }
+    next();
+}
+
+function init() {
+    if (localStorage.getItem("zen52_theme") === "light") {
+        document.body.classList.add("light-mode");
+        el.theme.querySelector("span").textContent = "☾";
+    }
+    const chartPref = localStorage.getItem("zen52_chart_pref") || "heatmap";
+    el.chartContainer.classList.toggle("hidden", chartPref !== "bar");
+    el.heatmapContainer.classList.toggle("hidden", chartPref === "bar");
+    el.intention.value = settings.currentIntention || "";
+    timeLeft = settings.focus || TEMPLATES.zen52.focus * 60;
+    el.quote.textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    el.syncStatus.textContent = settings.syncEnabled ? "Sync status: ready" : "Sync status: local only";
+    bindEvents();
+    updatePresetLabels();
+    updateCycleIndicator();
+    updateDisplay();
+    renderTasks();
+    renderBlockSets();
+    renderRoutines();
+    renderData();
+    checkBackupReminder();
+    registerServiceWorker();
+}
+
+init();
