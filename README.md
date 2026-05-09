@@ -1,7 +1,7 @@
 # 🧘 Zen52 - Deep Work Rhythm
 
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
-[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 
 **Zen52** is a premium productivity application designed around the **52/17 rule**: 52 minutes of intense, unbroken focus followed by 17 minutes of complete rest. It combines a minimalist aesthetic with high-performance features to help you enter and maintain a flow state.
 
@@ -36,12 +36,15 @@
 ## 🛠️ Tech Stack
 
 - **Frontend**: Vanilla JavaScript (ES6+), CSS3 (Modern Grid/Flexbox), HTML5.
-- **Backend**: Python (Flask) hosted on Vercel (optional for local use).
-- **Data**: Local-first storage using `localStorage` with export/import capabilities.
+- **Backend**: Python (Flask) hosted on Vercel.
+- **Offline First**: Full functionality remains available even without an internet connection.
 
 ---
 
 ## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.8+
 
 ### Local Development
 1. Clone the repository:
@@ -50,13 +53,13 @@
    cd zen52
    ```
 
-2. Run the development server:
+2. Install dependencies:
    ```bash
-   python -m http.server 5000 --directory public
+   pip install -r requirements.txt
    ```
-   *Or use the Flask backend:*
+
+3. Run the development server:
    ```bash
-   pip install flask
    python api/index.py
    ```
    Open `http://localhost:5000` in your browser.
