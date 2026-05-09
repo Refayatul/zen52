@@ -2,6 +2,7 @@
   "name": "Zen52 - Focus & Clarity",
   "short_name": "Zen52",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#08090a",
   "theme_color": "#08090a",

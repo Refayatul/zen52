@@ -11,6 +11,12 @@
 </head>
 
 <body>
+    <div id="backup-reminder" class="backup-reminder hidden" role="status">
+        <span>Your focus data is local to this browser.</span>
+        <button id="backup-now-btn" class="btn primary small" type="button">Export</button>
+        <button id="backup-dismiss-btn" class="icon-btn square subtle" type="button" aria-label="Dismiss backup reminder">×</button>
+    </div>
+
     <div class="app-shell">
         <header class="topbar" aria-label="Zen52 controls">
             <a class="brand" href="/" aria-label="Zen52 home">
@@ -21,15 +27,10 @@
                 </span>
             </a>
             <div class="top-controls">
-                <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme" title="Theme">
-                    <span aria-hidden="true">☼</span>
-                </button>
-                <button id="settings-btn" class="icon-btn" type="button" aria-label="Open settings" title="Settings">
-                    <span aria-hidden="true">⚙</span>
-                </button>
-                <button id="zen-toggle" class="icon-btn" type="button" aria-label="Toggle zen mode" title="Zen mode">
-                    <span aria-hidden="true">⛶</span>
-                </button>
+                <button id="command-btn" class="icon-btn" type="button" aria-label="Open command menu" title="Command menu">⌘</button>
+                <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme" title="Theme"><span aria-hidden="true">☼</span></button>
+                <button id="settings-btn" class="icon-btn" type="button" aria-label="Open settings" title="Settings"><span aria-hidden="true">⚙</span></button>
+                <button id="zen-toggle" class="icon-btn" type="button" aria-label="Toggle zen mode" title="Zen mode"><span aria-hidden="true">⛶</span></button>
             </div>
         </header>
 
@@ -39,20 +40,28 @@
                     <p class="eyebrow">Deep work rhythm</p>
                     <h1 id="app-title">52 minutes of focus. 17 minutes to reset.</h1>
                     <p id="quote-text" class="quote">Focus is the key to productivity.</p>
+
+                    <div class="intention-panel">
+                        <label for="intention-input">Focus intention</label>
+                        <input id="intention-input" type="text" autocomplete="off" placeholder="What will you finish this session?">
+                        <div class="session-context">
+                            <span id="selected-task-label">No task linked</span>
+                            <span id="active-template-label">Template: Zen52</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="timer-stage" aria-live="polite">
-                    <div class="timer-ring" aria-hidden="true">
-                        <div class="ring-core"></div>
-                    </div>
+                    <div class="timer-ring" aria-hidden="true"><div class="ring-core"></div></div>
                     <div id="timer-display" class="timer">52:00</div>
                     <div id="status-text" class="status-indicator">Focus Mode</div>
+                    <div id="zen-task-label" class="zen-task-label">No task linked</div>
                 </div>
 
                 <div class="session-strip">
                     <div id="daily-goal-container" class="goal-card">
                         <div class="daily-goal-header">
-                            <span>Daily goal</span>
+                            <span id="goal-label">Daily goal</span>
                             <span id="daily-goal-text">0 / 4 hrs</span>
                         </div>
                         <div class="progress-bar-bg" aria-hidden="true">
@@ -80,38 +89,33 @@
                 </div>
 
                 <div class="preset-buttons" aria-label="Timer presets">
-                    <button class="preset-chip" type="button" data-focus="25" data-break="5">
-                        Pomodoro <span class="preset-time">25/5</span>
-                    </button>
-                    <button class="preset-chip active" type="button" data-focus="52" data-break="17">
-                        Zen52 <span class="preset-time">52/17</span>
-                    </button>
-                    <button class="preset-chip" type="button" data-focus="90" data-break="15">
-                        Deep Work <span class="preset-time">90/15</span>
-                    </button>
+                    <button class="preset-chip" type="button" data-template="pomodoro">Pomodoro <span class="preset-time">25/5</span></button>
+                    <button class="preset-chip active" type="button" data-template="zen52">Zen52 <span class="preset-time">52/17</span></button>
+                    <button class="preset-chip" type="button" data-template="deep">Deep Work <span class="preset-time">90/15</span></button>
+                    <button class="preset-chip" type="button" data-template="writing">Writing <span class="preset-time">45/10</span></button>
+                    <button class="preset-chip" type="button" data-template="study">Study <span class="preset-time">50/10</span></button>
                     <button id="custom-timer-btn" class="preset-chip custom-chip" type="button">Custom</button>
                 </div>
 
                 <div id="custom-timer-input" class="custom-timer-input hidden">
-                    <label>
-                        <span>Focus</span>
-                        <input type="number" id="quick-focus" min="1" max="180" value="52">
-                    </label>
-                    <label>
-                        <span>Break</span>
-                        <input type="number" id="quick-break" min="1" max="60" value="17">
-                    </label>
+                    <label><span>Focus</span><input type="number" id="quick-focus" min="1" max="180" value="52"></label>
+                    <label><span>Break</span><input type="number" id="quick-break" min="1" max="60" value="17"></label>
                     <button id="apply-custom-btn" class="btn primary small" type="button">Apply</button>
                 </div>
+            </section>
+
+            <section class="today-grid" aria-label="Today dashboard">
+                <article class="stat-card"><span>Today</span><strong id="stat-today-minutes">0m</strong><small>focused time</small></article>
+                <article class="stat-card"><span>Blocks</span><strong id="stat-today-sessions">0</strong><small>completed focus sessions</small></article>
+                <article class="stat-card"><span>Tasks</span><strong id="stat-today-tasks">0</strong><small>completed today</small></article>
+                <article class="stat-card"><span>Interruptions</span><strong id="stat-interruptions">0</strong><small>paused or reset sessions</small></article>
             </section>
 
             <section class="workspace-grid" aria-label="Focus workspace">
                 <article class="feature-card task-card">
                     <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Now</p>
-                            <h2>Tasks</h2>
-                        </div>
+                        <div><p class="card-kicker">Now</p><h2>Tasks</h2></div>
+                        <button id="clear-completed-btn" class="btn secondary small" type="button">Clear done</button>
                     </div>
                     <div class="task-input-group">
                         <input type="text" id="task-input" placeholder="What are you working on?" autocomplete="off">
@@ -122,10 +126,7 @@
 
                 <article class="feature-card">
                     <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Capture</p>
-                            <h2>Brain dump</h2>
-                        </div>
+                        <div><p class="card-kicker">Capture</p><h2>Brain dump</h2></div>
                         <button id="clear-scratchpad-btn" class="icon-btn square subtle" type="button" title="Clear notes" aria-label="Clear notes">⌫</button>
                     </div>
                     <textarea id="scratchpad" class="scratchpad" placeholder="Clear your mind before the next block."></textarea>
@@ -133,85 +134,68 @@
 
                 <article class="feature-card sound-card">
                     <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Sound</p>
-                            <h2>Ambience</h2>
+                        <div><p class="card-kicker">Sound</p><h2>Ambience</h2></div>
+                        <div class="mini-actions">
+                            <button id="save-sound-profile-btn" class="btn secondary small" type="button">Save mix</button>
+                            <button id="load-sound-profile-btn" class="btn secondary small" type="button">Load</button>
                         </div>
                     </div>
                     <div class="sound-controls">
-                        <div class="sound-item">
-                            <button class="sound-btn" type="button" data-sound="rain" title="Rain">Rain</button>
-                            <input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.05" value="0.45" aria-label="Rain volume">
-                        </div>
-                        <div class="sound-item">
-                            <button class="sound-btn" type="button" data-sound="forest" title="Forest">Forest</button>
-                            <input type="range" class="volume-slider" data-sound="forest" min="0" max="1" step="0.05" value="0.35" aria-label="Forest volume">
-                        </div>
-                        <div class="sound-item">
-                            <button class="sound-btn" type="button" data-sound="waves" title="Waves">Waves</button>
-                            <input type="range" class="volume-slider" data-sound="waves" min="0" max="1" step="0.05" value="0.4" aria-label="Waves volume">
-                        </div>
+                        <div class="sound-item"><button class="sound-btn" type="button" data-sound="rain">Rain</button><input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.05" value="0.45" aria-label="Rain volume"></div>
+                        <div class="sound-item"><button class="sound-btn" type="button" data-sound="forest">Forest</button><input type="range" class="volume-slider" data-sound="forest" min="0" max="1" step="0.05" value="0.35" aria-label="Forest volume"></div>
+                        <div class="sound-item"><button class="sound-btn" type="button" data-sound="waves">Waves</button><input type="range" class="volume-slider" data-sound="waves" min="0" max="1" step="0.05" value="0.4" aria-label="Waves volume"></div>
                     </div>
                 </article>
 
                 <article class="feature-card chart-card">
                     <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Review</p>
-                            <h2>Consistency</h2>
-                        </div>
+                        <div><p class="card-kicker">Review</p><h2>Consistency</h2></div>
                         <button id="chart-toggle-btn" class="icon-btn square subtle" type="button" title="Toggle view" aria-label="Toggle chart view">▦</button>
                     </div>
-                    <div id="chart-container" class="chart-container hidden">
-                        <div id="weekly-chart" class="weekly-chart" aria-label="Weekly focus chart"></div>
-                    </div>
+                    <div id="chart-container" class="chart-container hidden"><div id="weekly-chart" class="weekly-chart" aria-label="Weekly focus chart"></div></div>
                     <div id="heatmap-container" class="heatmap-container">
                         <div id="heatmap-grid" class="heatmap-grid"></div>
                         <div class="heatmap-legend">
-                            <span>Less</span>
-                            <span class="heatmap-cell" data-level="0"></span>
-                            <span class="heatmap-cell" data-level="1"></span>
-                            <span class="heatmap-cell" data-level="2"></span>
-                            <span class="heatmap-cell" data-level="3"></span>
-                            <span class="heatmap-cell" data-level="4"></span>
-                            <span>More</span>
+                            <span>Less</span><span class="heatmap-cell" data-level="0"></span><span class="heatmap-cell" data-level="1"></span><span class="heatmap-cell" data-level="2"></span><span class="heatmap-cell" data-level="3"></span><span class="heatmap-cell" data-level="4"></span><span>More</span>
                         </div>
                     </div>
                 </article>
 
                 <article class="feature-card badges-card">
-                    <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Progress</p>
-                            <h2>Achievements</h2>
-                        </div>
-                    </div>
-                    <div class="badges-grid">
-                        <div class="badge-item locked" id="badge-novice" title="Complete 1 focus session">
-                            <div class="badge-icon">01</div>
-                            <span>Novice</span>
-                        </div>
-                        <div class="badge-item locked" id="badge-streak" title="Reach a 3-day streak">
-                            <div class="badge-icon">03</div>
-                            <span>Consistent</span>
-                        </div>
-                        <div class="badge-item locked" id="badge-master" title="Accumulate 10 hours of focus">
-                            <div class="badge-icon">10h</div>
-                            <span>Master</span>
-                        </div>
-                    </div>
+                    <div class="card-header-row"><div><p class="card-kicker">Progress</p><h2>Achievements</h2></div></div>
+                    <div id="badges-grid" class="badges-grid"></div>
                 </article>
 
                 <article class="feature-card history-card">
                     <div class="card-header-row">
-                        <div>
-                            <p class="card-kicker">Log</p>
-                            <h2>Session history</h2>
-                        </div>
+                        <div><p class="card-kicker">Log</p><h2>Session history</h2></div>
+                        <button id="open-journal-btn" class="btn secondary small" type="button">Journal</button>
                     </div>
-                    <ul id="history-list" class="history-list">
-                        <li class="loading-text">Loading history...</li>
-                    </ul>
+                    <ul id="history-list" class="history-list"><li class="loading-text">Loading history...</li></ul>
+                </article>
+
+                <article class="feature-card data-card wide-card">
+                    <div class="card-header-row"><div><p class="card-kicker">Data</p><h2>Focus analytics</h2></div></div>
+                    <div class="data-grid">
+                        <div><span>Week</span><strong id="data-week-total">0m</strong></div>
+                        <div><span>Month</span><strong id="data-month-total">0m</strong></div>
+                        <div><span>Best day</span><strong id="data-best-day">0m</strong></div>
+                        <div><span>Average</span><strong id="data-average-session">0m</strong></div>
+                    </div>
+                </article>
+
+                <article class="feature-card blockers-card">
+                    <div class="card-header-row"><div><p class="card-kicker">Guardrails</p><h2>Distraction list</h2></div></div>
+                    <div class="task-input-group">
+                        <input type="text" id="blocker-input" placeholder="Site or app to avoid" autocomplete="off">
+                        <button id="add-blocker-btn" class="icon-btn square" type="button" aria-label="Add blocker">+</button>
+                    </div>
+                    <ul id="blocker-list" class="pill-list"></ul>
+                </article>
+
+                <article class="feature-card routines-card">
+                    <div class="card-header-row"><div><p class="card-kicker">Break</p><h2>Routine</h2></div></div>
+                    <div id="routine-list" class="routine-list"></div>
                 </article>
             </section>
         </main>
@@ -219,30 +203,13 @@
 
     <dialog id="settings-modal" class="settings-modal">
         <form method="dialog" class="modal-content">
-            <div class="modal-header">
-                <h2>Settings</h2>
-                <button id="close-settings" class="close-btn" type="button" aria-label="Close settings">×</button>
-            </div>
-            <div class="setting-group">
-                <label for="focus-duration">Focus duration</label>
-                <input type="number" id="focus-duration" value="52" min="1" max="180">
-            </div>
-            <div class="setting-group">
-                <label for="break-duration">Break duration</label>
-                <input type="number" id="break-duration" value="17" min="1" max="60">
-            </div>
-            <div class="setting-group">
-                <label for="daily-goal-input">Daily goal in hours</label>
-                <input type="number" id="daily-goal-input" value="4" min="0.5" max="24" step="0.5">
-            </div>
-            <div class="setting-group">
-                <label>Presets</label>
-                <div class="setting-group-row">
-                    <button class="btn secondary small preset-btn" type="button" data-focus="25" data-break="5">Pomodoro</button>
-                    <button class="btn secondary small preset-btn" type="button" data-focus="52" data-break="17">Zen52</button>
-                    <button class="btn secondary small preset-btn" type="button" data-focus="90" data-break="15">Deep Work</button>
-                </div>
-            </div>
+            <div class="modal-header"><h2>Settings</h2><button id="close-settings" class="close-btn" type="button" aria-label="Close settings">×</button></div>
+            <div class="setting-group"><label for="focus-duration">Focus duration</label><input type="number" id="focus-duration" value="52" min="1" max="180"></div>
+            <div class="setting-group"><label for="break-duration">Break duration</label><input type="number" id="break-duration" value="17" min="1" max="60"></div>
+            <div class="setting-group"><label for="daily-goal-input">Daily goal</label><input type="number" id="daily-goal-input" value="4" min="0.5" max="24" step="0.5"></div>
+            <div class="setting-group"><label for="goal-type-input">Goal type</label><select id="goal-type-input"><option value="hours">Hours focused</option><option value="sessions">Focus sessions</option><option value="tasks">Completed tasks</option></select></div>
+            <div class="setting-group checkbox-row"><label><input id="autostart-break-input" type="checkbox"> Auto-start breaks</label><label><input id="autostart-focus-input" type="checkbox"> Auto-start next focus</label><label><input id="sync-enabled-input" type="checkbox"> Try backend sync</label></div>
+            <p id="sync-status" class="sync-status">Sync status: local only</p>
             <div class="modal-divider"></div>
             <div class="setting-group-row">
                 <button id="export-data-btn" class="btn secondary small" type="button">Export data</button>
@@ -255,26 +222,31 @@
 
     <dialog id="shortcuts-modal" class="settings-modal">
         <form method="dialog" class="modal-content">
-            <div class="modal-header">
-                <h2>Keyboard shortcuts</h2>
-                <button id="close-shortcuts" class="close-btn" type="button" aria-label="Close shortcuts">×</button>
-            </div>
+            <div class="modal-header"><h2>Keyboard shortcuts</h2><button id="close-shortcuts" class="close-btn" type="button" aria-label="Close shortcuts">×</button></div>
             <ul class="shortcut-list">
                 <li class="shortcut-item"><span>Play / pause</span><span class="key-badge">Space</span></li>
                 <li class="shortcut-item"><span>Reset timer</span><span class="key-badge">R</span></li>
+                <li class="shortcut-item"><span>Command menu</span><span class="key-badge">Ctrl K</span></li>
                 <li class="shortcut-item"><span>Mute ambience</span><span class="key-badge">M</span></li>
             </ul>
         </form>
     </dialog>
 
+    <dialog id="command-modal" class="settings-modal command-modal">
+        <form method="dialog" class="modal-content">
+            <div class="modal-header"><h2>Command menu</h2><button id="close-command" class="close-btn" type="button" aria-label="Close command menu">×</button></div>
+            <input id="command-search" class="command-search" type="text" placeholder="Search commands..." autocomplete="off">
+            <div id="command-list" class="command-list"></div>
+        </form>
+    </dialog>
+
     <dialog id="session-notes-modal" class="settings-modal">
         <form method="dialog" class="modal-content">
-            <div class="modal-header">
-                <h2>Focus complete</h2>
-            </div>
-            <p class="modal-copy">What did you accomplish?</p>
+            <div class="modal-header"><h2>Focus complete</h2></div>
+            <p id="session-review-copy" class="modal-copy">What did you accomplish?</p>
             <textarea id="session-note-input" class="scratchpad compact" placeholder="I worked on..."></textarea>
             <div class="setting-group-row align-end">
+                <button id="mark-task-done-btn" class="btn secondary" type="button">Mark linked task done</button>
                 <button id="skip-note-btn" class="btn secondary" type="button">Skip</button>
                 <button id="save-note-btn" class="btn primary" type="button">Save note</button>
             </div>
@@ -283,14 +255,9 @@
 
     <dialog id="break-modal" class="settings-modal">
         <form method="dialog" class="modal-content centered-modal">
-            <div class="modal-header centered-header">
-                <h2>Break time</h2>
-            </div>
+            <div class="modal-header centered-header"><h2>Break time</h2></div>
             <p id="break-suggestion" class="break-suggestion">Stand up and stretch.</p>
-            <div id="breathing-exercise" class="breathing-exercise hidden">
-                <div id="breath-circle" class="breath-circle"></div>
-                <p id="breath-instruction">Breathe in...</p>
-            </div>
+            <div id="breathing-exercise" class="breathing-exercise hidden"><div id="breath-circle" class="breath-circle"></div><p id="breath-instruction">Breathe in...</p></div>
             <div class="setting-group-row align-center">
                 <button id="start-breathing-btn" class="btn secondary small" type="button">Breathing exercise</button>
                 <button id="close-break-btn" class="btn primary small" type="button">Done</button>
@@ -298,6 +265,15 @@
         </form>
     </dialog>
 
+    <dialog id="journal-modal" class="settings-modal journal-modal">
+        <form method="dialog" class="modal-content">
+            <div class="modal-header"><h2>Focus journal</h2><button id="close-journal" class="close-btn" type="button" aria-label="Close journal">×</button></div>
+            <input id="journal-search" class="command-search" type="search" placeholder="Search notes, intentions, tasks..." autocomplete="off">
+            <div id="journal-list" class="journal-list"></div>
+        </form>
+    </dialog>
+
+    <button id="zen-exit-btn" class="zen-exit-btn hidden" type="button">Exit focus</button>
     <button id="shortcuts-btn" class="shortcuts-help-btn" type="button" title="Shortcuts" aria-label="Keyboard shortcuts">?</button>
     <script src="script.js"></script>
 </body>
