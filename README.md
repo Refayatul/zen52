@@ -1,8 +1,7 @@
 # 🧘 Zen52 - Deep Work Rhythm
 
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
-[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
-[![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 
 **Zen52** is a premium productivity application designed around the **52/17 rule**: 52 minutes of intense, unbroken focus followed by 17 minutes of complete rest. It combines a minimalist aesthetic with high-performance features to help you enter and maintain a flow state.
 
@@ -37,17 +36,12 @@
 ## 🛠️ Tech Stack
 
 - **Frontend**: Vanilla JavaScript (ES6+), CSS3 (Modern Grid/Flexbox), HTML5.
-- **Backend**: Python (Flask) hosted on Vercel.
-- **Database**: Supabase (PostgreSQL) for secure session syncing.
-- **Offline First**: Full functionality remains available even without an internet connection.
+- **Backend**: Python (Flask) hosted on Vercel (optional for local use).
+- **Data**: Local-first storage using `localStorage` with export/import capabilities.
 
 ---
 
 ## 🚀 Getting Started
-
-### Prerequisites
-- Python 3.8+
-- A Supabase project (optional for local dev)
 
 ### Local Development
 1. Clone the repository:
@@ -56,23 +50,17 @@
    cd zen52
    ```
 
-2. Install dependencies:
+2. Run the development server:
    ```bash
-   pip install -r requirements.txt
+   python -m http.server 5000 --directory public
    ```
-
-3. Setup environment variables:
-   Create a `.env` file based on `.env.example`:
-   ```env
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_anon_key
-   ```
-
-4. Run the development server:
+   *Or use the Flask backend:*
    ```bash
+   pip install flask
    python api/index.py
    ```
    Open `http://localhost:5000` in your browser.
+
 
 ---
 
