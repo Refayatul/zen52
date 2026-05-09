@@ -210,7 +210,7 @@ h2 {
 
 .timer-ring {
     position: absolute;
-    width: min(78vw, 390px);
+    width: min(82vw, 440px);
     aspect-ratio: 1;
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -230,7 +230,8 @@ h2 {
 }
 
 .timer {
-    font-size: clamp(68px, 11vw, 142px);
+    max-width: min(72vw, 360px);
+    font-size: clamp(64px, 9vw, 120px);
     font-weight: 590;
     line-height: 0.9;
     letter-spacing: -0.06em;
@@ -1004,7 +1005,8 @@ body.zen-mode .controls {
     }
 
     .timer {
-        font-size: clamp(64px, 23vw, 92px);
+        max-width: 76vw;
+        font-size: clamp(58px, 20vw, 82px);
     }
 
     .status-indicator {
