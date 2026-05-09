@@ -185,12 +185,25 @@
                 </article>
 
                 <article class="feature-card blockers-card">
-                    <div class="card-header-row"><div><p class="card-kicker">Guardrails</p><h2>Distraction list</h2></div></div>
-                    <div class="task-input-group">
-                        <input type="text" id="blocker-input" placeholder="Site or app to avoid" autocomplete="off">
-                        <button id="add-blocker-btn" class="icon-btn square" type="button" aria-label="Add blocker">+</button>
+                    <div class="card-header-row">
+                        <div><p class="card-kicker">Guardrails</p><h2>Block sets</h2></div>
+                        <button id="lockdown-btn" class="btn secondary small" type="button">Lockdown</button>
                     </div>
-                    <ul id="blocker-list" class="pill-list"></ul>
+                    <div class="blockset-form">
+                        <input type="text" id="blockset-name-input" placeholder="Set name" autocomplete="off">
+                        <textarea id="blockset-sites-input" class="mini-textarea" placeholder="Sites or apps, one per line"></textarea>
+                        <div class="compact-row">
+                            <input type="text" id="blockset-times-input" placeholder="0900-1230,1330-1700">
+                            <input type="number" id="blockset-limit-input" min="0" max="1440" placeholder="Limit min">
+                        </div>
+                        <div class="compact-row">
+                            <input type="number" id="blockset-delay-input" min="0" max="300" placeholder="Delay sec">
+                            <input type="number" id="lockdown-mins-input" min="1" max="1440" value="25" title="Lockdown minutes">
+                        </div>
+                        <button id="add-blockset-btn" class="btn primary small" type="button">Add block set</button>
+                    </div>
+                    <div id="guardrail-status" class="guardrail-status"></div>
+                    <ul id="blockset-list" class="blockset-list"></ul>
                 </article>
 
                 <article class="feature-card routines-card">

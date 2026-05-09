@@ -67,14 +67,15 @@ const defaults = {
     currentIntention: "",
     activeRoutine: "stretch",
     soundProfile: null,
-    lastBackupAt: null
+    lastBackupAt: null,
+    lockdownUntil: 0
 };
 
 let settings = { ...defaults, ...storage.get("zen52_settings", {}) };
 let sessions = storage.get("zen52_sessions", []);
 let tasks = storage.get("zen52_tasks", []);
 let notes = storage.get("zen52_session_notes", []);
-let blockers = storage.get("zen52_blockers", []);
+let blockSets = storage.get("zen52_blocksets", []);
 let interruptions = storage.get("zen52_interruptions", []);
 let timeLeft = settings.focus;
 let isFocusMode = true;
@@ -129,9 +130,16 @@ const el = {
     historyList: $("history-list"),
     badgesGrid: $("badges-grid"),
     routineList: $("routine-list"),
-    blockerInput: $("blocker-input"),
-    addBlocker: $("add-blocker-btn"),
-    blockerList: $("blocker-list"),
+    blocksetNameInput: $("blockset-name-input"),
+    blocksetSitesInput: $("blockset-sites-input"),
+    blocksetTimesInput: $("blockset-times-input"),
+    blocksetLimitInput: $("blockset-limit-input"),
+    blocksetDelayInput: $("blockset-delay-input"),
+    lockdownMinsInput: $("lockdown-mins-input"),
+    addBlockset: $("add-blockset-btn"),
+    lockdown: $("lockdown-btn"),
+    guardrailStatus: $("guardrail-status"),
+    blocksetList: $("blockset-list"),
     exportData: $("export-data-btn"),
     importData: $("import-data-btn"),
     importInput: $("import-file-input"),
@@ -175,7 +183,7 @@ function saveAll() {
     storage.set("zen52_sessions", sessions);
     storage.set("zen52_tasks", tasks);
     storage.set("zen52_session_notes", notes);
-    storage.set("zen52_blockers", blockers);
+    storage.set("zen52_blocksets", blockSets);
     storage.set("zen52_interruptions", interruptions);
 }
 
@@ -203,9 +211,11 @@ function updateDisplay() {
     el.timer.textContent = formatTime(timeLeft);
     document.title = `${formatTime(timeLeft)} - ${isFocusMode ? "Focus" : "Break"} | Zen52`;
     const task = selectedTask();
+    const activeBlocks = activeBlockSets();
     const label = task ? `Task: ${task.text}` : "No task linked";
+    const guardrails = activeBlocks.length ? ` · Avoid: ${activeBlocks.flatMap(set => set.sites).slice(0, 4).join(", ")}` : "";
     el.selectedTaskLabel.textContent = label;
-    el.zenTaskLabel.textContent = label;
+    el.zenTaskLabel.textContent = `${label}${guardrails}`;
     el.templateLabel.textContent = `Template: ${TEMPLATES[settings.activeTemplate]?.name || "Custom"}`;
 }
 
@@ -649,6 +659,107 @@ function renderTasks() {
     });
 }
 
+function parseTimePeriods(value) {
+    return String(value || "")
+        .split(/[,\s]+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .map(part => {
+            const match = part.match(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/);
+            if (!match) return null;
+            const start = Number(match[1]) * 60 + Number(match[2]);
+            const end = Number(match[3]) * 60 + Number(match[4]);
+            return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null;
+        })
+        .filter(Boolean);
+}
+
+function isWithinPeriod(period, minutes) {
+    if (period.start <= period.end) return minutes >= period.start && minutes < period.end;
+    return minutes >= period.start || minutes < period.end;
+}
+
+function activeBlockSets(date = new Date()) {
+    const mins = date.getHours() * 60 + date.getMinutes();
+    const lockdown = Number(settings.lockdownUntil || 0) > Date.now();
+    return blockSets.filter(set => {
+        if (lockdown) return true;
+        if (set.overrideUntil && set.overrideUntil > Date.now()) return false;
+        const periods = parseTimePeriods(set.times);
+        const scheduled = periods.length ? periods.some(period => isWithinPeriod(period, mins)) : isFocusMode && isRunning;
+        return scheduled;
+    });
+}
+
+function renderBlockSets() {
+    const active = activeBlockSets();
+    el.guardrailStatus.textContent = active.length
+        ? `Active guardrails: ${active.map(set => set.name).join(", ")}`
+        : "No guardrails active right now.";
+    el.blocksetList.replaceChildren();
+    if (!blockSets.length) {
+        const empty = document.createElement("li");
+        empty.className = "loading-text";
+        empty.textContent = "No block sets yet.";
+        el.blocksetList.append(empty);
+        return;
+    }
+    blockSets.forEach(set => {
+        const item = document.createElement("li");
+        item.className = `blockset-item ${active.some(activeSet => activeSet.id === set.id) ? "active" : ""}`;
+        const header = document.createElement("header");
+        const title = document.createElement("strong");
+        title.textContent = set.name;
+        const limit = document.createElement("small");
+        limit.textContent = set.limit ? `${set.limit}m budget` : "no budget";
+        header.append(title, limit);
+        const sites = document.createElement("small");
+        sites.textContent = set.sites.join(", ");
+        const schedule = document.createElement("small");
+        schedule.textContent = set.times ? `Schedule ${set.times}` : "Active during focus sessions";
+        const actions = document.createElement("div");
+        actions.className = "blockset-actions";
+        const override = document.createElement("button");
+        override.type = "button";
+        override.textContent = set.delay ? `Override ${set.delay}s` : "Override";
+        override.addEventListener("click", () => {
+            const run = () => {
+                set.overrideUntil = Date.now() + 10 * 60 * 1000;
+                saveAll();
+                renderBlockSets();
+                updateDisplay();
+            };
+            if (set.delay) {
+                override.disabled = true;
+                let left = set.delay;
+                override.textContent = `${left}s`;
+                const id = setInterval(() => {
+                    left -= 1;
+                    override.textContent = `${left}s`;
+                    if (left <= 0) {
+                        clearInterval(id);
+                        run();
+                    }
+                }, 1000);
+            } else {
+                run();
+            }
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () => {
+            blockSets = blockSets.filter(itemSet => itemSet.id !== set.id);
+            saveAll();
+            renderBlockSets();
+            updateDisplay();
+        });
+        actions.append(override, remove);
+        item.append(header, sites, schedule, actions);
+        el.blocksetList.append(item);
+    });
+}
+
 function addTask() {
     const text = el.taskInput.value.trim();
     if (!text) return;
@@ -659,24 +770,6 @@ function addTask() {
     saveAll();
     renderTasks();
     updateDisplay();
-}
-
-function renderBlockers() {
-    el.blockerList.replaceChildren();
-    blockers.forEach(blocker => {
-        const item = document.createElement("li");
-        item.textContent = blocker;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = "×";
-        button.addEventListener("click", () => {
-            blockers = blockers.filter(b => b !== blocker);
-            saveAll();
-            renderBlockers();
-        });
-        item.append(button);
-        el.blockerList.append(item);
-    });
 }
 
 function renderRoutines() {
@@ -739,6 +832,7 @@ function commands() {
         { name: "Switch theme", hint: "Dark / light", action: toggleTheme },
         { name: "Open journal", hint: "Search sessions", action: () => openJournal() },
         { name: "Export data", hint: "Local backup", action: exportData },
+        { name: "Start lockdown", hint: "Activate all block sets", action: startLockdown },
         { name: "Pomodoro preset", hint: "25/5", action: () => applyTemplate("pomodoro") },
         { name: "Zen52 preset", hint: "52/17", action: () => applyTemplate("zen52") },
         { name: "Deep Work preset", hint: "90/15", action: () => applyTemplate("deep") }
@@ -794,7 +888,7 @@ function updateCycleIndicator() {
 }
 
 function exportData() {
-    const data = { sessions, tasks, notes, blockers, interruptions, settings, scratchpad: localStorage.getItem("zen52_scratchpad") || "" };
+    const data = { sessions, tasks, notes, blockSets, interruptions, settings, scratchpad: localStorage.getItem("zen52_scratchpad") || "" };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -815,7 +909,7 @@ function importData(file) {
             sessions = Array.isArray(data.sessions) ? data.sessions : sessions;
             tasks = Array.isArray(data.tasks) ? data.tasks : tasks;
             notes = Array.isArray(data.notes) ? data.notes : notes;
-            blockers = Array.isArray(data.blockers) ? data.blockers : blockers;
+            blockSets = Array.isArray(data.blockSets) ? data.blockSets : Array.isArray(data.blockers) ? data.blockers.map(name => ({ id: Date.now() + Math.random(), name, sites: [name], times: "", limit: 0, delay: 0 })) : blockSets;
             interruptions = Array.isArray(data.interruptions) ? data.interruptions : interruptions;
             settings = { ...settings, ...(data.settings || {}) };
             if (typeof data.scratchpad === "string") localStorage.setItem("zen52_scratchpad", data.scratchpad);
@@ -832,6 +926,39 @@ function checkBackupReminder() {
     const last = settings.lastBackupAt ? new Date(settings.lastBackupAt) : null;
     const shouldShow = sessions.length >= 5 && (!last || Date.now() - last.getTime() > 21 * MS_DAY);
     el.backupReminder.classList.toggle("hidden", !shouldShow);
+}
+
+function addBlockSet() {
+    const sites = el.blocksetSitesInput.value
+        .split(/\n+/)
+        .map(site => site.trim())
+        .filter(Boolean);
+    if (!sites.length) return;
+    blockSets.push({
+        id: Date.now(),
+        name: el.blocksetNameInput.value.trim() || "Focus block",
+        sites,
+        times: el.blocksetTimesInput.value.trim(),
+        limit: Number(el.blocksetLimitInput.value) || 0,
+        delay: Number(el.blocksetDelayInput.value) || 0,
+        overrideUntil: 0
+    });
+    el.blocksetNameInput.value = "";
+    el.blocksetSitesInput.value = "";
+    el.blocksetTimesInput.value = "";
+    el.blocksetLimitInput.value = "";
+    el.blocksetDelayInput.value = "";
+    saveAll();
+    renderBlockSets();
+    updateDisplay();
+}
+
+function startLockdown() {
+    const mins = Number(el.lockdownMinsInput?.value || 25);
+    settings.lockdownUntil = Date.now() + Math.max(1, mins) * 60 * 1000;
+    saveAll();
+    renderBlockSets();
+    updateDisplay();
 }
 
 function getAudioContext() {
@@ -992,15 +1119,8 @@ function bindEvents() {
             localStorage.setItem("zen52_scratchpad", "");
         }
     });
-    el.addBlocker.addEventListener("click", () => {
-        const text = el.blockerInput.value.trim();
-        if (!text) return;
-        blockers.push(text);
-        el.blockerInput.value = "";
-        saveAll();
-        renderBlockers();
-    });
-    el.blockerInput.addEventListener("keydown", e => { if (e.key === "Enter") el.addBlocker.click(); });
+    el.addBlockset.addEventListener("click", addBlockSet);
+    el.lockdown.addEventListener("click", startLockdown);
     el.exportData.addEventListener("click", exportData);
     el.importData.addEventListener("click", () => el.importInput.click());
     el.importInput.addEventListener("change", e => e.target.files[0] && importData(e.target.files[0]));
@@ -1108,7 +1228,7 @@ function init() {
     updateCycleIndicator();
     updateDisplay();
     renderTasks();
-    renderBlockers();
+    renderBlockSets();
     renderRoutines();
     renderData();
     checkBackupReminder();

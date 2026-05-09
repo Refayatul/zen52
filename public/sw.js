@@ -1,4 +1,4 @@
-const CACHE_NAME = "zen52-v2";
+const CACHE_NAME = "zen52-v3";
 const APP_ASSETS = [
     "./",
     "./index.html",

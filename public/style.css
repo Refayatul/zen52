@@ -406,6 +406,81 @@ input:focus, textarea:focus, select:focus { border-color: rgba(113, 112, 255, 0.
 
 .pill-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .pill-list button { margin-left: 6px; background: transparent; color: var(--quiet); cursor: pointer; }
+.blockset-form {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.mini-textarea {
+    min-height: 64px;
+    resize: vertical;
+}
+
+.compact-row {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    gap: 8px;
+}
+
+.guardrail-status {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.blockset-list {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+}
+
+.blockset-item {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.blockset-item.active {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.blockset-item header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.blockset-item small {
+    color: var(--muted);
+}
+
+.blockset-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.blockset-actions button {
+    min-height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 11px;
+}
 .routine-list { display: grid; gap: 10px; }
 .routine-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface); }
 .routine-item.active { border-color: var(--accent); }
