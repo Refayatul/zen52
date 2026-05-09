@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Zen52">
+  <rect width="512" height="512" rx="112" fill="#08090a"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#23252a" stroke-width="18"/>
+  <path d="M256 80a176 176 0 0 1 152 264" fill="none" stroke="#7170ff" stroke-width="18" stroke-linecap="round"/>
+  <path d="M168 198h132l-132 126h148" fill="none" stroke="#f7f8f8" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="392" fill="#8a8f98" font-family="Inter, Arial, sans-serif" font-size="58" font-weight="700" text-anchor="middle">52</text>
+</svg>

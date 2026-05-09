@@ -1,293 +1,222 @@
-// --- Constants & State ---
 const DEFAULT_FOCUS_TIME = 52 * 60;
 const DEFAULT_BREAK_TIME = 17 * 60;
+const SESSIONS_BEFORE_LONG_BREAK = 4;
+const LONG_BREAK_DURATION = 25 * 60;
 
-// Load settings from local storage or default
-let focusDuration = parseInt(localStorage.getItem('zen52_focus_time')) || DEFAULT_FOCUS_TIME;
-let breakDuration = parseInt(localStorage.getItem('zen52_break_time')) || DEFAULT_BREAK_TIME;
-let dailyGoalHours = parseFloat(localStorage.getItem('zen52_daily_goal')) || 4;
+const storage = {
+    getNumber(key, fallback) {
+        const value = Number(localStorage.getItem(key));
+        return Number.isFinite(value) && value > 0 ? value : fallback;
+    },
+    getJSON(key, fallback) {
+        try {
+            const value = JSON.parse(localStorage.getItem(key) || "");
+            return value ?? fallback;
+        } catch {
+            return fallback;
+        }
+    },
+    setJSON(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+    }
+};
 
+let focusDuration = storage.getNumber("zen52_focus_time", DEFAULT_FOCUS_TIME);
+let breakDuration = storage.getNumber("zen52_break_time", DEFAULT_BREAK_TIME);
+let dailyGoalHours = storage.getNumber("zen52_daily_goal", 4);
+let currentSession = storage.getNumber("zen52_current_session", 1);
 let timeLeft = focusDuration;
 let timerId = null;
 let isRunning = false;
 let isFocusMode = true;
+let localSessions = storage.getJSON("zen52_sessions", []);
+let tasks = storage.getJSON("zen52_tasks", []);
 
-// Pomodoro Cycle State
-let currentSession = parseInt(localStorage.getItem('zen52_current_session')) || 1;
-const SESSIONS_BEFORE_LONG_BREAK = 4;
-const LONG_BREAK_DURATION = 25 * 60; // 25 minutes
+const timerDisplay = document.getElementById("timer-display");
+const statusText = document.getElementById("status-text");
+const startBtn = document.getElementById("start-btn");
+const resetBtn = document.getElementById("reset-btn");
+const historyList = document.getElementById("history-list");
+const zenToggle = document.getElementById("zen-toggle");
+const themeToggle = document.getElementById("theme-toggle");
+const streakContainer = document.getElementById("streak-container");
+const streakCountDisplay = document.getElementById("streak-count");
+const dailyGoalText = document.getElementById("daily-goal-text");
+const dailyGoalProgress = document.getElementById("daily-goal-progress");
+const quoteText = document.getElementById("quote-text");
+const scratchpad = document.getElementById("scratchpad");
+const settingsBtn = document.getElementById("settings-btn");
+const settingsModal = document.getElementById("settings-modal");
+const closeSettingsBtn = document.getElementById("close-settings");
+const saveSettingsBtn = document.getElementById("save-settings");
+const focusInput = document.getElementById("focus-duration");
+const breakInput = document.getElementById("break-duration");
+const goalInput = document.getElementById("daily-goal-input");
+const shortcutsBtn = document.getElementById("shortcuts-btn");
+const shortcutsModal = document.getElementById("shortcuts-modal");
+const closeShortcutsBtn = document.getElementById("close-shortcuts");
+const taskInput = document.getElementById("task-input");
+const addTaskBtn = document.getElementById("add-task-btn");
+const taskList = document.getElementById("task-list");
+const customTimerBtn = document.getElementById("custom-timer-btn");
+const customTimerInput = document.getElementById("custom-timer-input");
+const quickFocusInput = document.getElementById("quick-focus");
+const quickBreakInput = document.getElementById("quick-break");
+const applyCustomBtn = document.getElementById("apply-custom-btn");
+const chartToggleBtn = document.getElementById("chart-toggle-btn");
+const chartContainer = document.getElementById("chart-container");
+const heatmapContainer = document.getElementById("heatmap-container");
+const weeklyChart = document.getElementById("weekly-chart");
+const heatmapGrid = document.getElementById("heatmap-grid");
+const exportBtn = document.getElementById("export-data-btn");
+const importBtn = document.getElementById("import-data-btn");
+const importInput = document.getElementById("import-file-input");
+const clearScratchpadBtn = document.getElementById("clear-scratchpad-btn");
+const sessionNotesModal = document.getElementById("session-notes-modal");
+const sessionNoteInput = document.getElementById("session-note-input");
+const saveNoteBtn = document.getElementById("save-note-btn");
+const skipNoteBtn = document.getElementById("skip-note-btn");
+const breakModal = document.getElementById("break-modal");
+const breakSuggestion = document.getElementById("break-suggestion");
+const closeBreakBtn = document.getElementById("close-break-btn");
+const startBreathingBtn = document.getElementById("start-breathing-btn");
+const breathingExercise = document.getElementById("breathing-exercise");
+const breathInstruction = document.getElementById("breath-instruction");
+const soundBtns = document.querySelectorAll(".sound-btn");
+const soundSliders = document.querySelectorAll(".volume-slider");
 
-// Break Suggestions
-const breakSuggestions = [
-    "🧘 Stand up and stretch for 2 minutes",
-    "💧 Drink a glass of water",
-    "👀 Look at something 20 feet away for 20 seconds (20-20-20 rule)",
-    "🚶 Take a short walk around the room",
-    "🌬️ Take 5 deep breaths",
-    "🙆 Roll your shoulders and neck",
-    "🪟 Look outside a window for a minute",
-    "✋ Stretch your wrists and fingers",
-    "🧍 Do 10 jumping jacks",
-    "☕ Make yourself a hot drink"
+const QUOTES = [
+    "Do one thing at a time.",
+    "Attention is a limited resource. Spend it deliberately.",
+    "A clear desk starts with a clear next task.",
+    "The goal is not more hours. The goal is better attention.",
+    "Protect the first minute and the next fifty-one get easier.",
+    "Less switching. More finishing.",
+    "Depth beats urgency when the work matters."
 ];
 
-// DOM Elements
-const timerDisplay = document.getElementById('timer-display');
-const statusText = document.getElementById('status-text');
-const startBtn = document.getElementById('start-btn');
-const resetBtn = document.getElementById('reset-btn');
-const historyList = document.getElementById('history-list');
+const BREAK_SUGGESTIONS = [
+    "Stand up and stretch for two minutes.",
+    "Drink a glass of water.",
+    "Look at something far away for 20 seconds.",
+    "Take a short walk around the room.",
+    "Take five slow breaths.",
+    "Roll your shoulders and relax your neck.",
+    "Stretch your wrists and fingers.",
+    "Step away from the screen before the next block."
+];
 
-// Zen & Features Elements
-const zenToggle = document.getElementById('zen-toggle');
-const themeToggle = document.getElementById('theme-toggle'); // New
-const streakContainer = document.getElementById('streak-container'); // New
-const streakCountDisplay = document.getElementById('streak-count'); // New
-const soundBtns = document.querySelectorAll('.sound-btn');
-const soundSliders = document.querySelectorAll('.volume-slider');
-const taskInput = document.getElementById('task-input');
-const addTaskBtn = document.getElementById('add-task-btn');
-const taskListUl = document.getElementById('task-list');
-
-// Goal & Quote Elements
-const dailyGoalText = document.getElementById('daily-goal-text');
-const dailyGoalProgress = document.getElementById('daily-goal-progress');
-const goalInput = document.getElementById('daily-goal-input'); // In Settings
-const quoteText = document.getElementById('quote-text');
-const scratchpad = document.getElementById('scratchpad'); // New
-
-// Settings Elements
-const settingsBtn = document.getElementById('settings-btn');
-const settingsModal = document.getElementById('settings-modal');
-const closeSettingsBtn = document.getElementById('close-settings');
-const saveSettingsBtn = document.getElementById('save-settings');
-const shortcutsBtn = document.getElementById('shortcuts-btn'); // New
-const shortcutsModal = document.getElementById('shortcuts-modal'); // New
-const closeShortcutsBtn = document.getElementById('close-shortcuts'); // New
-const focusInput = document.getElementById('focus-duration');
-const breakInput = document.getElementById('break-duration');
-
-// --- Local Storage History Logic ---
-let localSessions = JSON.parse(localStorage.getItem('zen52_sessions')) || [];
-
-// --- Helper Functions ---
 function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 function updateDisplay() {
     timerDisplay.textContent = formatTime(timeLeft);
-    const mode = isFocusMode ? 'Focus' : 'Break';
-    document.title = `${formatTime(timeLeft)} - ${mode} | Zen52`;
+    document.title = `${formatTime(timeLeft)} - ${isFocusMode ? "Focus" : "Break"} | Zen52`;
+}
+
+function setStartButton(label, paused = false) {
+    startBtn.textContent = label;
+    startBtn.classList.toggle("is-paused", paused);
+}
+
+function requestNotifications() {
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+}
+
+function notify(title, body) {
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+    }
+}
+
+function playTone(frequency = 660) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = frequency;
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.6);
+    } catch {
+        // Audio is optional.
+    }
 }
 
 function switchMode() {
     isFocusMode = !isFocusMode;
-    timeLeft = isFocusMode ? focusDuration : breakDuration;
-
     if (isFocusMode) {
+        timeLeft = focusDuration;
         statusText.textContent = "Focus Mode";
-        timerDisplay.classList.remove('break-mode');
+        timerDisplay.classList.remove("break-mode");
+        setStartButton("Start Focus");
     } else {
-        statusText.textContent = "Break Mode";
-        timerDisplay.classList.add('break-mode');
+        const isLongBreak = currentSession > SESSIONS_BEFORE_LONG_BREAK;
+        timeLeft = isLongBreak ? LONG_BREAK_DURATION : breakDuration;
+        statusText.textContent = isLongBreak ? "Long Break" : "Break Mode";
+        timerDisplay.classList.add("break-mode");
+        setStartButton("Start Break");
+        showBreakModal();
     }
-
     updateDisplay();
 }
 
-// --- Gamification Logic ---
-function calculateStreak(sessions) {
-    // Basic streak: Consecutive days with at least 1 focus session
-    const uniqueDays = [...new Set(sessions
-        .filter(s => s.type === 'focus')
-        .map(s => new Date(s.created_at).toLocaleDateString())
-    )]; // List of unique date strings
+function completeInterval() {
+    clearInterval(timerId);
+    timerId = null;
+    isRunning = false;
 
-    // Convert keys to dates and sort descending
-    const sortedDates = uniqueDays.map(d => new Date(d)).sort((a, b) => b - a);
-
-    let streak = 0;
-    if (sortedDates.length === 0) return 0;
-
-    // For simplicity MVP: just count unique days in sorted list that effectively form a chain
-    // But we need to ensure the chain starts from *now*.
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const lastSessionDate = sortedDates[0];
-    lastSessionDate.setHours(0, 0, 0, 0);
-
-    // If last session was before yesterday, streak is broken (0)
-    // 86400000 ms = 1 day
-    const diff = (today - lastSessionDate) / 86400000;
-
-    if (diff > 1) return 0; // Broke streak
-
-    streak = 1;
-    for (let i = 0; i < sortedDates.length - 1; i++) {
-        const curr = sortedDates[i].getTime();
-        const prev = sortedDates[i + 1].getTime(); // Older date
-
-        const dayDiff = Math.abs((curr - prev) / 86400000); // Should use abs or ensure sort order
-
-        if (Math.round(dayDiff) === 1) {
-            streak++;
-        } else {
-            break;
+    if (isFocusMode) {
+        saveSession(Math.floor(focusDuration / 60), "focus");
+        currentSession += 1;
+        if (currentSession > SESSIONS_BEFORE_LONG_BREAK + 1) currentSession = 1;
+        localStorage.setItem("zen52_current_session", currentSession);
+        updateCycleIndicator();
+        playTone(720);
+        notify("Focus complete", "Time for a deliberate break.");
+        sessionNotesModal?.showModal();
+    } else {
+        if (currentSession > SESSIONS_BEFORE_LONG_BREAK) {
+            currentSession = 1;
+            localStorage.setItem("zen52_current_session", currentSession);
+            updateCycleIndicator();
         }
+        playTone(520);
+        notify("Break over", "Start the next focus block when ready.");
     }
 
-    return streak;
-}
-
-function checkBadges(sessions) {
-    const focusSessions = sessions.filter(s => s.type === 'focus');
-    const totalMinutes = focusSessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
-    const currentStreak = calculateStreak(sessions);
-
-    // Badges definitions
-    const badges = {
-        'novice': focusSessions.length >= 1,
-        'streak': currentStreak >= 3,
-        'master': (totalMinutes / 60) >= 10
-    };
-
-    // Update UI
-    for (const [key, unlocked] of Object.entries(badges)) {
-        const badgeEl = document.getElementById(`badge-${key}`);
-        if (badgeEl) {
-            if (unlocked) {
-                if (badgeEl.classList.contains('locked')) {
-                    // Just unlocked! Could toast here.
-                    triggerNotification("Badge Unlocked!", `You earned the ${key} badge!`);
-                }
-                badgeEl.classList.remove('locked');
-            } else {
-                badgeEl.classList.add('locked');
-            }
-        }
-    }
-
-    return currentStreak;
-}
-
-function updateDailyGoal(sessions) {
-    const todayStr = new Date().toLocaleDateString();
-
-    // Filter sessions for today
-    const todaySessions = sessions.filter(s =>
-        s.type === 'focus' &&
-        new Date(s.created_at).toLocaleDateString() === todayStr
-    );
-
-    const totalMinutes = todaySessions.reduce((acc, curr) => acc + parseInt(curr.duration), 0);
-    const totalHours = totalMinutes / 60;
-
-    // Render
-    const percent = Math.min((totalHours / dailyGoalHours) * 100, 100);
-    dailyGoalProgress.style.width = `${percent}%`;
-    dailyGoalText.textContent = `${totalHours.toFixed(1)} / ${dailyGoalHours} hrs`;
-}
-
-const QUOTES = [
-    "Focus is the key to productivity.",
-    "Do one thing at a time.",
-    "Simplicity is the ultimate sophistication.",
-    "The journey of a thousand miles begins with one step.",
-    "Productivity is being able to do things that you were never able to do before.",
-    "Your future is created by what you do today, not tomorrow.",
-    "It’s not always that we need to do more but rather that we need to focus on less.",
-    "Starve your distractions, feed your focus.",
-    "Don't busy, be productive.",
-    "Flow with the moment."
-];
-
-function showRandomQuote() {
-    const randomIndex = Math.floor(Math.random() * QUOTES.length);
-    quoteText.textContent = `"${QUOTES[randomIndex]}"`;
-}
-async function saveSession(duration, type) {
-    const session = {
-        id: Date.now(),
-        created_at: new Date().toISOString(),
-        duration: duration,
-        type: type
-    };
-
-    // 1. Save Locally
-    localSessions.unshift(session);
-    localStorage.setItem('zen52_sessions', JSON.stringify(localSessions));
-
-    // Update UI immediately (Local First!)
-    fetchHistory();
-
-    // 2. Try Backend (Silent Sync)
-    try {
-        await fetch('/api/save-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ duration, type }),
-        });
-    } catch (error) {
-        console.log('Backend sync failed, but saved locally.');
-    }
-}
-
-function triggerNotification(title, body) {
-    if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/favicon.ico' });
-    }
+    switchMode();
 }
 
 function startTimer() {
     if (isRunning) return;
-
-    // Request Notification permission on first start
-    if (Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-
+    requestNotifications();
     isRunning = true;
-    startBtn.textContent = 'Pause';
-    startBtn.style.backgroundColor = '#6e7681';
-
+    setStartButton("Pause", true);
     timerId = setInterval(() => {
-        if (timeLeft > 0) {
-            timeLeft--;
-            updateDisplay();
-        } else {
-            clearInterval(timerId);
-            isRunning = false;
-            startBtn.textContent = 'Start Focus';
-            startBtn.style.backgroundColor = '';
-
-            if (isFocusMode) {
-                saveSession(Math.floor(focusDuration / 60), 'focus');
-                // Play notification sound
-                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3').play().catch(() => console.log('Audio blocked'));
-                triggerNotification("Focus Complete", "Great job! Time for a break.");
-
-                // Show Session Notes Modal
-                const sessionNotesModal = document.getElementById('session-notes-modal');
-                if (sessionNotesModal) sessionNotesModal.showModal();
-            } else {
-                new Audio('https://assets.mixkit.co/sfx/preview/mixkit-simple-notification-26.mp3').play().catch(() => console.log('Audio blocked'));
-                triggerNotification("Break Over", "Time to focus again.");
-            }
-
-            switchMode();
+        if (timeLeft <= 0) {
+            completeInterval();
+            return;
         }
+        timeLeft -= 1;
+        updateDisplay();
     }, 1000);
 }
 
 function pauseTimer() {
     clearInterval(timerId);
+    timerId = null;
     isRunning = false;
-    startBtn.textContent = 'Resume';
-    startBtn.style.backgroundColor = '';
+    setStartButton("Resume");
 }
 
 function resetTimer() {
@@ -295,759 +224,606 @@ function resetTimer() {
     isFocusMode = true;
     timeLeft = focusDuration;
     statusText.textContent = "Focus Mode";
-    timerDisplay.classList.remove('break-mode');
-    startBtn.textContent = 'Start Focus';
+    timerDisplay.classList.remove("break-mode");
+    setStartButton("Start Focus");
     updateDisplay();
 }
 
-function updateCycleIndicator() {
-    const dots = document.querySelectorAll('.cycle-dot');
-    const label = document.getElementById('cycle-label');
+function saveSession(duration, type) {
+    const session = {
+        id: Date.now(),
+        created_at: new Date().toISOString(),
+        duration,
+        type
+    };
+    localSessions.unshift(session);
+    storage.setJSON("zen52_sessions", localSessions);
+    renderData();
 
-    dots.forEach((dot, index) => {
-        dot.classList.remove('active', 'completed');
-        if (index < currentSession - 1) {
-            dot.classList.add('completed');
-        } else if (index === currentSession - 1) {
-            dot.classList.add('active');
-        }
-    });
-
-    if (label) {
-        const displaySession = Math.min(currentSession, 4);
-        label.textContent = `Session ${displaySession}/4`;
-    }
-}
-// --- Event Listeners ---
-
-startBtn.addEventListener('click', () => {
-    if (isRunning) {
-        pauseTimer();
-    } else {
-        startTimer();
-    }
-});
-
-resetBtn.addEventListener('click', resetTimer);
-
-// --- Zen Mode ---
-zenToggle.addEventListener('click', () => {
-    document.body.classList.toggle('zen-mode');
-    const icon = zenToggle.querySelector('i');
-    if (document.body.classList.contains('zen-mode')) {
-        icon.classList.replace('fa-expand', 'fa-compress');
-    } else {
-        icon.classList.replace('fa-compress', 'fa-expand');
-    }
-});
-
-// --- Theme Toggle ---
-themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('light-mode');
-    const icon = themeToggle.querySelector('i');
-    const isLight = document.body.classList.contains('light-mode');
-
-    // Switch Icon
-    if (isLight) icon.classList.replace('fa-sun', 'fa-moon');
-    else icon.classList.replace('fa-moon', 'fa-sun');
-
-    // Save pref
-    localStorage.setItem('zen52_theme', isLight ? 'light' : 'dark');
-});
-
-// Load Theme
-if (localStorage.getItem('zen52_theme') === 'light') {
-    document.body.classList.add('light-mode');
-    themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+    fetch("/api/save-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duration, type })
+    }).catch(() => {});
 }
 
-// --- Settings Logic ---
-settingsBtn.addEventListener('click', () => {
-    // Pre-populate values
-    focusInput.value = Math.floor(focusDuration / 60);
-    breakInput.value = Math.floor(breakDuration / 60);
-    if (goalInput) goalInput.value = dailyGoalHours;
-    settingsModal.showModal();
-});
+function calculateStreak(sessions) {
+    const focusDays = [...new Set(
+        sessions
+            .filter(session => session.type === "focus")
+            .map(session => {
+                const date = new Date(session.created_at);
+                date.setHours(0, 0, 0, 0);
+                return date.getTime();
+            })
+    )].sort((a, b) => b - a);
 
-// Presets (both in settings and main screen)
-document.querySelectorAll('.preset-chip, .preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const newFocus = parseInt(btn.dataset.focus);
-        const newBreak = parseInt(btn.dataset.break);
+    if (!focusDays.length) return 0;
 
-        if (newFocus && newBreak) {
-            focusDuration = newFocus * 60;
-            breakDuration = newBreak * 60;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const latestDiff = Math.round((today.getTime() - focusDays[0]) / 86400000);
+    if (latestDiff > 1) return 0;
 
-            // Save to localStorage
-            localStorage.setItem('zen52_focus_time', focusDuration);
-            localStorage.setItem('zen52_break_time', breakDuration);
+    let streak = 1;
+    for (let i = 0; i < focusDays.length - 1; i += 1) {
+        const dayDiff = Math.round((focusDays[i] - focusDays[i + 1]) / 86400000);
+        if (dayDiff === 1) streak += 1;
+        else break;
+    }
+    return streak;
+}
 
-            // Update timer if not running
-            if (!isRunning) {
-                if (isFocusMode) timeLeft = focusDuration;
-                else timeLeft = breakDuration;
-                updateDisplay();
-            }
+function updateBadges(sessions) {
+    const focusSessions = sessions.filter(session => session.type === "focus");
+    const totalMinutes = focusSessions.reduce((total, session) => total + Number(session.duration || 0), 0);
+    const streak = calculateStreak(sessions);
+    const badges = {
+        novice: focusSessions.length >= 1,
+        streak: streak >= 3,
+        master: totalMinutes >= 600
+    };
 
-            // Update active state for chips
-            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
-            if (btn.classList.contains('preset-chip')) {
-                btn.classList.add('active');
-            }
-
-            // Update settings inputs if modal is open
-            if (focusInput) focusInput.value = newFocus;
-            if (breakInput) breakInput.value = newBreak;
-        }
+    Object.entries(badges).forEach(([key, unlocked]) => {
+        const badge = document.getElementById(`badge-${key}`);
+        badge?.classList.toggle("locked", !unlocked);
     });
-});
 
-// Custom Timer Logic
-const customTimerBtn = document.getElementById('custom-timer-btn');
-const customTimerInput = document.getElementById('custom-timer-input');
-const quickFocusInput = document.getElementById('quick-focus');
-const quickBreakInput = document.getElementById('quick-break');
-const applyCustomBtn = document.getElementById('apply-custom-btn');
+    streakCountDisplay.textContent = streak;
+    streakContainer.classList.toggle("hidden", streak === 0);
+}
 
-if (customTimerBtn) {
-    customTimerBtn.addEventListener('click', () => {
-        customTimerInput.classList.toggle('hidden');
-        // Pre-fill with current values
-        quickFocusInput.value = Math.floor(focusDuration / 60);
-        quickBreakInput.value = Math.floor(breakDuration / 60);
+function updateDailyGoal(sessions) {
+    const today = new Date().toLocaleDateString();
+    const totalMinutes = sessions
+        .filter(session => session.type === "focus" && new Date(session.created_at).toLocaleDateString() === today)
+        .reduce((total, session) => total + Number(session.duration || 0), 0);
+    const totalHours = totalMinutes / 60;
+    const percent = Math.min((totalHours / dailyGoalHours) * 100, 100);
+    dailyGoalProgress.style.width = `${percent}%`;
+    dailyGoalText.textContent = `${totalHours.toFixed(1)} / ${dailyGoalHours} hrs`;
+}
+
+function renderHistory(sessions) {
+    historyList.replaceChildren();
+    const recent = sessions.slice(0, 6);
+    if (!recent.length) {
+        const empty = document.createElement("li");
+        empty.className = "loading-text";
+        empty.textContent = "No sessions yet.";
+        historyList.appendChild(empty);
+        return;
+    }
+
+    recent.forEach(session => {
+        const item = document.createElement("li");
+        item.className = "history-item";
+        const type = document.createElement("span");
+        type.className = "type";
+        type.textContent = session.type === "focus" ? "Focus session" : "Break";
+        const time = document.createElement("span");
+        time.className = "time";
+        time.textContent = `${session.duration}m · ${new Date(session.created_at).toLocaleDateString()}`;
+        item.append(type, time);
+        historyList.appendChild(item);
     });
 }
 
-if (applyCustomBtn) {
-    applyCustomBtn.addEventListener('click', () => {
-        const newFocus = parseInt(quickFocusInput.value);
-        const newBreak = parseInt(quickBreakInput.value);
-
-        if (newFocus > 0 && newBreak > 0) {
-            focusDuration = newFocus * 60;
-            breakDuration = newBreak * 60;
-
-            localStorage.setItem('zen52_focus_time', focusDuration);
-            localStorage.setItem('zen52_break_time', breakDuration);
-
-            if (!isRunning) {
-                if (isFocusMode) timeLeft = focusDuration;
-                else timeLeft = breakDuration;
-                updateDisplay();
-            }
-
-            // Hide input and mark custom as active
-            customTimerInput.classList.add('hidden');
-            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
-            customTimerBtn.classList.add('active');
-        }
-    });
+function getDailyTotals(sessions) {
+    return sessions.reduce((days, session) => {
+        if (session.type !== "focus") return days;
+        const date = new Date(session.created_at).toLocaleDateString();
+        days[date] = (days[date] || 0) + Number(session.duration || 0);
+        return days;
+    }, {});
 }
 
-closeSettingsBtn.addEventListener('click', () => {
-    settingsModal.close();
-});
+function renderWeeklyChart(sessions) {
+    weeklyChart.replaceChildren();
+    const totals = getDailyTotals(sessions);
+    const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const values = [];
 
-saveSettingsBtn.addEventListener('click', () => {
-    const newFocus = parseInt(focusInput.value);
-    const newBreak = parseInt(breakInput.value);
-    const newGoal = parseFloat(goalInput.value);
-
-    if (newFocus > 0 && newBreak > 0 && newGoal > 0) {
-        focusDuration = newFocus * 60;
-        breakDuration = newBreak * 60;
-        dailyGoalHours = newGoal;
-
-        // Save to local storage
-        localStorage.setItem('zen52_focus_time', focusDuration);
-        localStorage.setItem('zen52_break_time', breakDuration);
-        localStorage.setItem('zen52_daily_goal', dailyGoalHours);
-
-        // If timer is not running, update current display immediately if in relevant mode
-        if (!isRunning) {
-            if (isFocusMode) timeLeft = focusDuration;
-            else timeLeft = breakDuration;
-            updateDisplay();
-        }
-
-        fetchHistory(); // Update goal UI if changed
-        settingsModal.close();
-    } else {
-        alert("Please enter valid positive numbers.");
-    }
-});
-
-// --- Sound Logic & Volume ---
-let currentSound = null;
-
-// Volume Sliders
-soundSliders.forEach(slider => {
-    slider.addEventListener('input', (e) => {
-        const soundType = e.target.dataset.sound;
-        const audio = document.getElementById(`audio-${soundType}`);
-        audio.volume = e.target.value;
-    });
-    // Set initial volume
-    const soundType = slider.dataset.sound;
-    const audio = document.getElementById(`audio-${soundType}`);
-    if (audio) audio.volume = slider.value;
-});
-
-// Play Buttons
-soundBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const soundType = btn.dataset.sound;
-        const audio = document.getElementById(`audio-${soundType}`);
-
-        // Match volume to slider
-        const slider = document.querySelector(`.volume-slider[data-sound="${soundType}"]`);
-        if (slider) audio.volume = slider.value;
-
-        // Toggle Logic
-        if (btn.classList.contains('active')) {
-            audio.pause();
-            audio.currentTime = 0;
-            btn.classList.remove('active');
-
-            // If this was the only sound playing, clear currentSound (simple logic)
-            if (currentSound === audio) currentSound = null;
-            return;
-        }
-
-        // Allow multiple sounds? Why not (It's a "Mixer" feature). 
-        // Previously we stopped others. Now let's allow mixing since we added volume controls!
-        // but if user wants single focus, they can just click one.
-
-        // Play
-        audio.play().then(() => {
-            btn.classList.add('active');
-            currentSound = audio; // Track last played
-        }).catch(e => {
-            console.log("Audio file missing or blocked", e);
-            alert(`Tip: Place a file named '${soundType}.mp3' in public/sounds/ to hear this!`);
+    for (let i = 6; i >= 0; i -= 1) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        values.push({
+            label: i === 0 ? "Today" : labels[date.getDay()],
+            value: totals[date.toLocaleDateString()] || 0
         });
-    });
-});
+    }
 
-// --- Task List Logic ---
-let tasks = JSON.parse(localStorage.getItem('zen52_tasks')) || [];
+    const max = Math.max(...values.map(day => day.value), 60);
+    values.forEach(day => {
+        const wrap = document.createElement("div");
+        wrap.className = "bar-wrap";
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.height = `${Math.max(4, (day.value / max) * 160)}px`;
+        bar.title = `${day.label}: ${day.value} minutes`;
+        const label = document.createElement("span");
+        label.textContent = day.label;
+        wrap.append(bar, label);
+        weeklyChart.appendChild(wrap);
+    });
+}
+
+function heatLevel(minutes) {
+    if (minutes >= 120) return 4;
+    if (minutes >= 60) return 3;
+    if (minutes >= 30) return 2;
+    if (minutes > 0) return 1;
+    return 0;
+}
+
+function renderHeatmap(sessions) {
+    heatmapGrid.replaceChildren();
+    const totals = getDailyTotals(sessions);
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 364);
+    startDate.setDate(startDate.getDate() - startDate.getDay());
+
+    for (let i = 0; i < 53 * 7; i += 1) {
+        const current = new Date(startDate);
+        current.setDate(startDate.getDate() + i);
+        if (current > today) break;
+        const dateKey = current.toLocaleDateString();
+        const minutes = totals[dateKey] || 0;
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        cell.dataset.level = heatLevel(minutes);
+        cell.title = `${dateKey}: ${minutes} minutes`;
+        heatmapGrid.appendChild(cell);
+    }
+}
+
+function renderData() {
+    renderHistory(localSessions);
+    renderWeeklyChart(localSessions);
+    renderHeatmap(localSessions);
+    updateBadges(localSessions);
+    updateDailyGoal(localSessions);
+}
+
+function updateCycleIndicator() {
+    document.querySelectorAll(".cycle-dot").forEach((dot, index) => {
+        dot.classList.toggle("completed", index < currentSession - 1);
+        dot.classList.toggle("active", index === Math.min(currentSession, 4) - 1);
+    });
+    const label = document.getElementById("cycle-label");
+    if (label) label.textContent = `Session ${Math.min(currentSession, 4)}/4`;
+}
 
 function saveTasks() {
-    localStorage.setItem('zen52_tasks', JSON.stringify(tasks));
+    storage.setJSON("zen52_tasks", tasks);
     renderTasks();
 }
 
 function renderTasks() {
-    taskListUl.innerHTML = '';
-    tasks.forEach((task, index) => {
-        const li = document.createElement('li');
-        li.className = 'task-item';
-        li.innerHTML = `
-            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
-            <span class="task-text">${task.text}</span>
-            <button class="task-delete"><i class="fa-solid fa-trash"></i></button>
-        `;
+    taskList.replaceChildren();
+    if (!tasks.length) {
+        const empty = document.createElement("li");
+        empty.className = "loading-text";
+        empty.textContent = "No active tasks.";
+        taskList.appendChild(empty);
+        return;
+    }
 
-        const checkbox = li.querySelector('.task-checkbox');
-        checkbox.addEventListener('change', () => {
+    tasks.forEach((task, index) => {
+        const item = document.createElement("li");
+        item.className = "task-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.className = "task-checkbox";
+        checkbox.type = "checkbox";
+        checkbox.checked = Boolean(task.completed);
+        checkbox.addEventListener("change", () => {
             tasks[index].completed = checkbox.checked;
             saveTasks();
         });
 
-        const deleteBtn = li.querySelector('.task-delete');
-        deleteBtn.addEventListener('click', () => {
+        const text = document.createElement("span");
+        text.className = "task-text";
+        text.textContent = task.text;
+
+        const del = document.createElement("button");
+        del.className = "task-delete";
+        del.type = "button";
+        del.setAttribute("aria-label", `Delete ${task.text}`);
+        del.textContent = "×";
+        del.addEventListener("click", () => {
             tasks.splice(index, 1);
             saveTasks();
         });
 
-        taskListUl.appendChild(li);
+        item.append(checkbox, text, del);
+        taskList.appendChild(item);
     });
 }
 
 function addTask() {
     const text = taskInput.value.trim();
-    if (text) {
-        tasks.push({ text, completed: false });
-        taskInput.value = '';
-        saveTasks();
-    }
+    if (!text) return;
+    tasks.push({ text, completed: false });
+    taskInput.value = "";
+    saveTasks();
 }
 
-addTaskBtn.addEventListener('click', addTask);
-taskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addTask();
+function applyDurations(focusMinutes, breakMinutes) {
+    if (!Number.isFinite(focusMinutes) || !Number.isFinite(breakMinutes) || focusMinutes <= 0 || breakMinutes <= 0) {
+        alert("Please enter valid positive numbers.");
+        return false;
+    }
+
+    focusDuration = focusMinutes * 60;
+    breakDuration = breakMinutes * 60;
+    localStorage.setItem("zen52_focus_time", focusDuration);
+    localStorage.setItem("zen52_break_time", breakDuration);
+
+    if (!isRunning) {
+        timeLeft = isFocusMode ? focusDuration : breakDuration;
+        updateDisplay();
+    }
+    return true;
+}
+
+function updatePresetActive(focusMinutes, breakMinutes, target) {
+    document.querySelectorAll(".preset-chip").forEach(chip => {
+        const matches = Number(chip.dataset.focus) === focusMinutes && Number(chip.dataset.break) === breakMinutes;
+        chip.classList.toggle("active", target ? chip === target : matches);
+    });
+}
+
+function showBreakModal() {
+    if (!breakModal || !breakSuggestion) return;
+    const text = BREAK_SUGGESTIONS[Math.floor(Math.random() * BREAK_SUGGESTIONS.length)];
+    breakSuggestion.textContent = text;
+    breathingExercise?.classList.add("hidden");
+    startBreathingBtn?.classList.remove("hidden");
+    breakModal.showModal();
+}
+
+let audioContext = null;
+const ambience = new Map();
+
+function getAudioContext() {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return audioContext;
+}
+
+function makeNoiseBuffer(ctx) {
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    return buffer;
+}
+
+function startAmbience(type, volume) {
+    const ctx = getAudioContext();
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+
+    const source = ctx.createBufferSource();
+    source.buffer = makeNoiseBuffer(ctx);
+    source.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = type === "rain" ? "highpass" : "lowpass";
+    filter.frequency.value = type === "rain" ? 900 : type === "forest" ? 520 : 360;
+
+    source.connect(filter).connect(gain).connect(ctx.destination);
+    source.start();
+
+    let lfo;
+    if (type !== "rain") {
+        lfo = ctx.createOscillator();
+        const lfoGain = ctx.createGain();
+        lfo.frequency.value = type === "waves" ? 0.12 : 0.35;
+        lfoGain.gain.value = type === "waves" ? 0.18 : 0.08;
+        lfo.connect(lfoGain).connect(gain.gain);
+        lfo.start();
+    }
+
+    ambience.set(type, { source, gain, lfo });
+}
+
+function stopAmbience(type) {
+    const item = ambience.get(type);
+    if (!item) return;
+    item.source.stop();
+    item.lfo?.stop();
+    ambience.delete(type);
+}
+
+function setAmbienceVolume(type, volume) {
+    const item = ambience.get(type);
+    if (item) item.gain.gain.value = volume;
+}
+
+function toggleMute() {
+    if (!ambience.size) return;
+    const shouldMute = [...ambience.values()].some(item => item.gain.gain.value > 0);
+    ambience.forEach((item, type) => {
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        item.gain.gain.value = shouldMute ? 0 : Number(slider?.value || 0.4);
+    });
+}
+
+startBtn.addEventListener("click", () => {
+    if (isRunning) pauseTimer();
+    else startTimer();
 });
 
-// --- Keyboard Shortcuts ---
-document.addEventListener('keydown', (e) => {
-    // Ignore shortcuts if typing in input or textarea
-    const activeElement = document.activeElement;
-    const isTyping = activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA';
+resetBtn.addEventListener("click", resetTimer);
 
+zenToggle.addEventListener("click", () => {
+    document.body.classList.toggle("zen-mode");
+});
+
+themeToggle.addEventListener("click", () => {
+    const isLight = document.body.classList.toggle("light-mode");
+    themeToggle.querySelector("span").textContent = isLight ? "☾" : "☼";
+    localStorage.setItem("zen52_theme", isLight ? "light" : "dark");
+});
+
+settingsBtn.addEventListener("click", () => {
+    focusInput.value = Math.floor(focusDuration / 60);
+    breakInput.value = Math.floor(breakDuration / 60);
+    goalInput.value = dailyGoalHours;
+    settingsModal.showModal();
+});
+
+closeSettingsBtn.addEventListener("click", () => settingsModal.close());
+
+saveSettingsBtn.addEventListener("click", () => {
+    const focusMinutes = Number(focusInput.value);
+    const breakMinutes = Number(breakInput.value);
+    const goal = Number(goalInput.value);
+    if (!applyDurations(focusMinutes, breakMinutes) || !Number.isFinite(goal) || goal <= 0) {
+        alert("Please enter valid positive numbers.");
+        return;
+    }
+    dailyGoalHours = goal;
+    localStorage.setItem("zen52_daily_goal", dailyGoalHours);
+    updatePresetActive(focusMinutes, breakMinutes);
+    renderData();
+    settingsModal.close();
+});
+
+document.querySelectorAll(".preset-chip, .preset-btn").forEach(button => {
+    button.addEventListener("click", () => {
+        const focusMinutes = Number(button.dataset.focus);
+        const breakMinutes = Number(button.dataset.break);
+        if (!focusMinutes || !breakMinutes) return;
+        applyDurations(focusMinutes, breakMinutes);
+        updatePresetActive(focusMinutes, breakMinutes, button.classList.contains("preset-chip") ? button : null);
+        focusInput.value = focusMinutes;
+        breakInput.value = breakMinutes;
+    });
+});
+
+customTimerBtn.addEventListener("click", () => {
+    customTimerInput.classList.toggle("hidden");
+    quickFocusInput.value = Math.floor(focusDuration / 60);
+    quickBreakInput.value = Math.floor(breakDuration / 60);
+});
+
+applyCustomBtn.addEventListener("click", () => {
+    const focusMinutes = Number(quickFocusInput.value);
+    const breakMinutes = Number(quickBreakInput.value);
+    if (!applyDurations(focusMinutes, breakMinutes)) return;
+    customTimerInput.classList.add("hidden");
+    updatePresetActive(focusMinutes, breakMinutes, customTimerBtn);
+});
+
+addTaskBtn.addEventListener("click", addTask);
+taskInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") addTask();
+});
+
+chartToggleBtn.addEventListener("click", () => {
+    const showBars = chartContainer.classList.contains("hidden");
+    chartContainer.classList.toggle("hidden", !showBars);
+    heatmapContainer.classList.toggle("hidden", showBars);
+    chartToggleBtn.textContent = showBars ? "▥" : "▦";
+    localStorage.setItem("zen52_chart_pref", showBars ? "bar" : "heatmap");
+});
+
+soundBtns.forEach(button => {
+    button.addEventListener("click", async () => {
+        const type = button.dataset.sound;
+        const slider = document.querySelector(`.volume-slider[data-sound="${type}"]`);
+        if (ambience.has(type)) {
+            stopAmbience(type);
+            button.classList.remove("active");
+            return;
+        }
+        startAmbience(type, Number(slider?.value || 0.4));
+        button.classList.add("active");
+    });
+});
+
+soundSliders.forEach(slider => {
+    slider.addEventListener("input", () => setAmbienceVolume(slider.dataset.sound, Number(slider.value)));
+});
+
+if (scratchpad) {
+    scratchpad.value = localStorage.getItem("zen52_scratchpad") || "";
+    scratchpad.addEventListener("input", () => localStorage.setItem("zen52_scratchpad", scratchpad.value));
+}
+
+clearScratchpadBtn.addEventListener("click", () => {
+    if (!scratchpad.value || confirm("Clear all brain dump notes?")) {
+        scratchpad.value = "";
+        localStorage.setItem("zen52_scratchpad", "");
+    }
+});
+
+shortcutsBtn.addEventListener("click", () => shortcutsModal.showModal());
+closeShortcutsBtn.addEventListener("click", () => shortcutsModal.close());
+
+[settingsModal, shortcutsModal, sessionNotesModal, breakModal].forEach(modal => {
+    modal?.addEventListener("click", event => {
+        if (event.target === modal) modal.close();
+    });
+});
+
+saveNoteBtn.addEventListener("click", () => {
+    const note = sessionNoteInput.value.trim();
+    if (note) {
+        const notes = storage.getJSON("zen52_session_notes", []);
+        notes.unshift({
+            note,
+            timestamp: new Date().toISOString(),
+            duration: Math.floor(focusDuration / 60)
+        });
+        storage.setJSON("zen52_session_notes", notes.slice(0, 50));
+    }
+    sessionNoteInput.value = "";
+    sessionNotesModal.close();
+});
+
+skipNoteBtn.addEventListener("click", () => {
+    sessionNoteInput.value = "";
+    sessionNotesModal.close();
+});
+
+closeBreakBtn.addEventListener("click", () => {
+    breakModal.close();
+    breathingExercise.classList.add("hidden");
+});
+
+startBreathingBtn.addEventListener("click", () => {
+    breathingExercise.classList.remove("hidden");
+    startBreathingBtn.classList.add("hidden");
+    const phases = [
+        { text: "Breathe in...", duration: 4000 },
+        { text: "Hold...", duration: 7000 },
+        { text: "Breathe out...", duration: 8000 }
+    ];
+    let phaseIndex = 0;
+    let cycles = 0;
+
+    function runPhase() {
+        if (!breakModal.open || cycles >= 3) {
+            breathInstruction.textContent = "Done.";
+            startBreathingBtn.classList.remove("hidden");
+            return;
+        }
+        breathInstruction.textContent = phases[phaseIndex].text;
+        setTimeout(() => {
+            phaseIndex += 1;
+            if (phaseIndex >= phases.length) {
+                phaseIndex = 0;
+                cycles += 1;
+            }
+            runPhase();
+        }, phases[phaseIndex].duration);
+    }
+
+    runPhase();
+});
+
+exportBtn.addEventListener("click", () => {
+    const data = {
+        sessions: localSessions,
+        tasks,
+        notes: storage.getJSON("zen52_session_notes", []),
+        scratchpad: localStorage.getItem("zen52_scratchpad") || "",
+        settings: {
+            focus: focusDuration,
+            break: breakDuration,
+            dailyGoal: dailyGoalHours,
+            theme: localStorage.getItem("zen52_theme") || "dark"
+        }
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `zen52_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+});
+
+importBtn.addEventListener("click", () => importInput.click());
+importInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(reader.result);
+            if (Array.isArray(data.sessions)) localStorage.setItem("zen52_sessions", JSON.stringify(data.sessions));
+            if (Array.isArray(data.tasks)) localStorage.setItem("zen52_tasks", JSON.stringify(data.tasks));
+            if (Array.isArray(data.notes)) localStorage.setItem("zen52_session_notes", JSON.stringify(data.notes));
+            if (typeof data.scratchpad === "string") localStorage.setItem("zen52_scratchpad", data.scratchpad);
+            if (data.settings) {
+                if (data.settings.focus) localStorage.setItem("zen52_focus_time", data.settings.focus);
+                if (data.settings.break) localStorage.setItem("zen52_break_time", data.settings.break);
+                if (data.settings.dailyGoal) localStorage.setItem("zen52_daily_goal", data.settings.dailyGoal);
+                if (data.settings.theme) localStorage.setItem("zen52_theme", data.settings.theme);
+            }
+            location.reload();
+        } catch {
+            alert("Invalid backup file.");
+        }
+    };
+    reader.readAsText(file);
+});
+
+document.addEventListener("keydown", event => {
+    const active = document.activeElement;
+    const isTyping = active && ["INPUT", "TEXTAREA"].includes(active.tagName);
     if (isTyping) return;
 
-    if (e.code === 'Space') {
-        e.preventDefault(); // Prevent scrolling
+    if (event.code === "Space") {
+        event.preventDefault();
         if (isRunning) pauseTimer();
         else startTimer();
     }
-
-    if (e.key.toLowerCase() === 'r') {
-        resetTimer();
-    }
-
-    if (e.key.toLowerCase() === 'm') {
-        toggleMute();
-    }
+    if (event.key.toLowerCase() === "r") resetTimer();
+    if (event.key.toLowerCase() === "m") toggleMute();
 });
 
-// History Logic
-function fetchHistory() {
-    // 1. Load from Local Variable (which is synced with localStorage)
-    const sessions = localSessions;
-
-    // 2. Render
-    renderHistory(sessions);
-    renderChart(sessions);
-
-    // 3. Logic
-    const streak = checkBadges(sessions);
-    if (streak > 0) {
-        streakCountDisplay.textContent = streak;
-        streakContainer.classList.remove('hidden');
-    } else {
-        streakContainer.classList.add('hidden');
+function init() {
+    if (localStorage.getItem("zen52_theme") === "light") {
+        document.body.classList.add("light-mode");
+        themeToggle.querySelector("span").textContent = "☾";
     }
 
-    updateDailyGoal(sessions);
+    const chartPref = localStorage.getItem("zen52_chart_pref") || "heatmap";
+    chartContainer.classList.toggle("hidden", chartPref !== "bar");
+    heatmapContainer.classList.toggle("hidden", chartPref === "bar");
+    chartToggleBtn.textContent = chartPref === "bar" ? "▥" : "▦";
+
+    updatePresetActive(Math.floor(focusDuration / 60), Math.floor(breakDuration / 60));
+    updateCycleIndicator();
+    updateDisplay();
+    renderTasks();
+    renderData();
+    quoteText.textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
 }
 
-// --- Data Backup & Restore ---
-const exportBtn = document.getElementById('export-data-btn');
-const importBtn = document.getElementById('import-data-btn');
-const importInput = document.getElementById('import-file-input');
-
-if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-        const data = {
-            sessions: JSON.parse(localStorage.getItem('zen52_sessions') || '[]'),
-            tasks: JSON.parse(localStorage.getItem('zen52_tasks') || '[]'),
-            settings: {
-                focus: localStorage.getItem('zen52_focus_time'),
-                break: localStorage.getItem('zen52_break_time'),
-                theme: localStorage.getItem('zen52_theme')
-            }
-        };
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `zen52_backup_${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-}
-
-if (importBtn) {
-    importBtn.addEventListener('click', () => importInput.click());
-
-    importInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const data = JSON.parse(event.target.result);
-
-                // Restore
-                if (data.sessions) localStorage.setItem('zen52_sessions', JSON.stringify(data.sessions));
-                if (data.tasks) localStorage.setItem('zen52_tasks', JSON.stringify(data.tasks));
-                if (data.settings) {
-                    if (data.settings.focus) localStorage.setItem('zen52_focus_time', data.settings.focus);
-                    if (data.settings.break) localStorage.setItem('zen52_break_time', data.settings.break);
-                    if (data.settings.theme) localStorage.setItem('zen52_theme', data.settings.theme);
-                }
-
-                alert('Data imported successfully! Reloading...');
-                location.reload();
-            } catch (err) {
-                alert('Invalid backup file.');
-            }
-        };
-        reader.readAsText(file);
-    });
-}
-
-function renderHistory(sessions) {
-    historyList.innerHTML = '';
-    // Show top 5 recent in list
-    const recentSessions = sessions.slice(0, 5);
-
-    if (recentSessions.length === 0) {
-        historyList.innerHTML = '<li class="loading-text">No recent sessions found.</li>';
-        return;
-    }
-    recentSessions.forEach(session => {
-        const date = new Date(session.created_at).toLocaleDateString();
-        const li = document.createElement('li');
-        li.className = 'history-item';
-        li.innerHTML = `
-            <span class="type">${session.type === 'focus' ? 'Focus Session' : 'Break'}</span>
-            <span class="time">${session.duration}m &middot; ${date}</span>
-        `;
-        historyList.appendChild(li);
-    });
-}
-
-// --- Chart Logic ---
-let focusChart = null;
-
-function renderChart(sessions) {
-    if (typeof renderHeatmap === 'function') renderHeatmap(sessions);
-    const ctx = document.getElementById('weekly-chart');
-    if (!ctx) return;
-
-    // Group by Date for the last 7 days
-    const dailyTotals = {};
-    sessions.forEach(session => {
-        if (session.type === 'focus') {
-            // Normalize date to string (local locale)
-            const dateStr = new Date(session.created_at).toLocaleDateString();
-            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
-        }
-    });
-
-    const labels = [];
-    const data = [];
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toLocaleDateString();
-        const dayName = i === 0 ? 'Today' : days[d.getDay()];
-
-        labels.push(dayName);
-        data.push(dailyTotals[dateStr] || 0);
-    }
-
-    if (focusChart) {
-        focusChart.destroy();
-    }
-
-    // Chart.js requires script tag in html, assumed present
-    if (typeof Chart !== 'undefined') {
-        focusChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Focus Minutes',
-                    data: data,
-                    backgroundColor: '#238636',
-                    borderRadius: 4,
-                    hoverBackgroundColor: '#2ea043'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#30363d' },
-                        ticks: { color: '#8b949e' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#8b949e' }
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
-    }
-}
-
-// --- Heatmap Logic ---
-function renderHeatmap(sessions) {
-    const grid = document.getElementById('heatmap-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // Calculate daily totals for last 365 days
-    const dailyTotals = {};
-    sessions.forEach(session => {
-        if (session.type === 'focus') {
-            const dateStr = new Date(session.created_at).toLocaleDateString();
-            dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + parseInt(session.duration);
-        }
-    });
-
-    // Generate last ~52 weeks (approx 364 days to keep grid clean 7x52)
-    const today = new Date();
-    // Start date: 52 weeks ago (aligned to Sunday if we want standard calendar, but simplify for now)
-    // Actually, let's just do 52 columns * 7 rows = 364 squares
-    // We render backwards or forwards? Usually columns are weeks.
-
-    // We need 52 colums. Each column 7 rows (Sun-Sat).
-    // Let's iterate weeks, then days.
-
-    // Determine start date: Today minus 364 days?
-    // Let's just create 365 divs? CSS grid-auto-flow: column handles the wrapping if we fix rows to 7.
-    // We need to order them correctly. grid-auto-flow: column fills col 1 (row1...7), then col 2.
-    // So we just need to push days in chronological order.
-
-    const startDate = new Date();
-    startDate.setDate(today.getDate() - 364);
-    // Adjustment to align start date to a Sunday?
-    // If we indiscriminately push days, and the first day is Wednesday, it will appear as Sunday (row 1).
-    // To align correctly: calculate offset to previous Sunday.
-    const dayOfWeek = startDate.getDay(); // 0 (Sun) to 6 (Sat)
-    startDate.setDate(startDate.getDate() - dayOfWeek); // Go back to Sunday
-
-    // Now loop for 53 weeks * 7 days to cover full width or until Today
-    const oneYearFromStart = new Date(today); // cap it?
-
-    // Let's render 53 weeks
-    for (let i = 0; i < 53 * 7; i++) {
-        const current = new Date(startDate);
-        current.setDate(startDate.getDate() + i);
-
-        if (current > today) break; // Don't show future? Or fill with empty.
-
-        const dateStr = current.toLocaleDateString();
-        const minutes = dailyTotals[dateStr] || 0;
-
-        let level = 0;
-        if (minutes > 0) level = 1;
-        if (minutes >= 30) level = 2;
-        if (minutes >= 60) level = 3;
-        if (minutes >= 120) level = 4;
-
-        const cell = document.createElement('div');
-        cell.className = 'heatmap-cell';
-        cell.dataset.level = level;
-        cell.title = `${dateStr}: ${minutes} mins`;
-        grid.appendChild(cell);
-    }
-}
-
-// Chart Toggling
-const chartToggleBtn = document.getElementById('chart-toggle-btn');
-const chartContainer = document.getElementById('chart-container');
-const heatmapContainer = document.getElementById('heatmap-container');
-
-if (chartToggleBtn) {
-    // Load pref - DEFAULT TO HEATMAP
-    const pref = localStorage.getItem('zen52_chart_pref') || 'heatmap';
-    if (pref === 'heatmap') {
-        chartContainer.classList.add('hidden');
-        heatmapContainer.classList.remove('hidden');
-        chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
-    }
-
-    chartToggleBtn.addEventListener('click', () => {
-        const isBar = !chartContainer.classList.contains('hidden');
-        if (isBar) {
-            // Switch to Heatmap
-            chartContainer.classList.add('hidden');
-            heatmapContainer.classList.remove('hidden');
-            chartToggleBtn.querySelector('i').classList.replace('fa-chart-simple', 'fa-border-all');
-            localStorage.setItem('zen52_chart_pref', 'heatmap');
-        } else {
-            // Switch to Bar
-            heatmapContainer.classList.add('hidden');
-            chartContainer.classList.remove('hidden');
-            chartToggleBtn.querySelector('i').classList.replace('fa-border-all', 'fa-chart-simple');
-            localStorage.setItem('zen52_chart_pref', 'bar');
-        }
-    });
-}
-
-// Hook into fetchHistory to render heatmap
-const originalFetchHistory = fetchHistory; // Wait, I can just append to the function body via replace... 
-// But I am rewriting the end of the file or specific logic? 
-// The tool I'm using replaces a block.
-// I replaced renderChart logic above. I should ensure renderHeatmap is CALLED.
-// Let's modify the fetchHistory function or helper.
-// Actually, I can just call renderHeatmap(sessions) inside renderChart? No, different responsibility.
-// Let's update renderChart to also call renderHeatmap or update fetchHistory.
-// Since I am replacing the renderChart function definition above, I can't easily hook there.
-// I will just add renderHeatmap(sessions) to the end of renderChart? 
-// No, better to update fetchHistory. But I am replacing the end of the file.
-
-// Let's just update renderChart to ALWAYS update the heatmap data too, since they share the same sessions data.
-// That way fetchHistory calls renderChart -> renderChart updates both visuals.
-// Efficient enough for now.
-
-// Wait, looking at the ReplacementContent above... I am defining renderHeatmap but NOT calling it.
-// I will rewrite renderChart above to call renderHeatmap(sessions) at start or end.
-
-// RE-WRITING RenderChart start to include heatmap call:
-/*
-function renderChart(sessions) {
-    renderHeatmap(sessions); // <--- Added
-    const ctx = document.getElementById('weekly-chart');
-...
-*/
-
-// --- Scratchpad Logic ---
-if (scratchpad) {
-    // Load
-    scratchpad.value = localStorage.getItem('zen52_scratchpad') || '';
-
-    // Save
-    scratchpad.addEventListener('input', () => {
-        localStorage.setItem('zen52_scratchpad', scratchpad.value);
-    });
-}
-
-// Clear Scratchpad Button
-const clearScratchpadBtn = document.getElementById('clear-scratchpad-btn');
-if (clearScratchpadBtn) {
-    clearScratchpadBtn.addEventListener('click', () => {
-        if (confirm('Clear all Brain Dump notes?')) {
-            scratchpad.value = '';
-            localStorage.setItem('zen52_scratchpad', '');
-        }
-    });
-}
-
-// --- Shortcuts Modal Logic ---
-if (shortcutsBtn) {
-    shortcutsBtn.addEventListener('click', () => shortcutsModal.showModal());
-    closeShortcutsBtn.addEventListener('click', () => shortcutsModal.close());
-    // Close on backdrop click
-    shortcutsModal.addEventListener('click', (e) => {
-        if (e.target === shortcutsModal) shortcutsModal.close();
-    });
-}
-
-// --- Session Notes Modal Logic ---
-const sessionNotesModal = document.getElementById('session-notes-modal');
-const sessionNoteInput = document.getElementById('session-note-input');
-const saveNoteBtn = document.getElementById('save-note-btn');
-const skipNoteBtn = document.getElementById('skip-note-btn');
-
-if (saveNoteBtn) {
-    saveNoteBtn.addEventListener('click', () => {
-        const note = sessionNoteInput.value.trim();
-        if (note) {
-            // Save note to localStorage with timestamp
-            const sessionNotes = JSON.parse(localStorage.getItem('zen52_session_notes') || '[]');
-            sessionNotes.unshift({
-                note: note,
-                timestamp: new Date().toISOString(),
-                duration: Math.floor(focusDuration / 60)
-            });
-            // Keep only last 50 notes
-            localStorage.setItem('zen52_session_notes', JSON.stringify(sessionNotes.slice(0, 50)));
-        }
-        sessionNoteInput.value = '';
-        sessionNotesModal.close();
-    });
-}
-
-if (skipNoteBtn) {
-    skipNoteBtn.addEventListener('click', () => {
-        sessionNoteInput.value = '';
-        sessionNotesModal.close();
-    });
-}
-
-// --- Break Modal Logic ---
-const breakModal = document.getElementById('break-modal');
-const closeBreakBtn = document.getElementById('close-break-btn');
-const startBreathingBtn = document.getElementById('start-breathing-btn');
-const breathingExercise = document.getElementById('breathing-exercise');
-const breathInstruction = document.getElementById('breath-instruction');
-
-if (closeBreakBtn) {
-    closeBreakBtn.addEventListener('click', () => {
-        breakModal.close();
-        if (breathingExercise) breathingExercise.classList.add('hidden');
-    });
-}
-
-if (startBreathingBtn) {
-    startBreathingBtn.addEventListener('click', () => {
-        breathingExercise.classList.remove('hidden');
-        startBreathingBtn.classList.add('hidden');
-
-        // 4-7-8 Breathing cycle
-        const phases = [
-            { text: "Breathe in...", duration: 4000 },
-            { text: "Hold...", duration: 7000 },
-            { text: "Breathe out...", duration: 8000 }
-        ];
-
-        let phaseIndex = 0;
-        let cycles = 0;
-
-        function runPhase() {
-            if (cycles >= 3) {
-                breathInstruction.textContent = "Great job! 🌟";
-                setTimeout(() => {
-                    breathingExercise.classList.add('hidden');
-                    startBreathingBtn.classList.remove('hidden');
-                }, 2000);
-                return;
-            }
-
-            breathInstruction.textContent = phases[phaseIndex].text;
-
-            setTimeout(() => {
-                phaseIndex++;
-                if (phaseIndex >= phases.length) {
-                    phaseIndex = 0;
-                    cycles++;
-                }
-                runPhase();
-            }, phases[phaseIndex].duration);
-        }
-
-        runPhase();
-    });
-}
-
-// Initialize cycle indicator on load
-updateCycleIndicator();
-
-// --- Mute Logic Helper ---
-function toggleMute() {
-    let anyMuted = false;
-    // Check if any active sound is muted (simplified: just toggle all based on first)
-    // Actually, let's just mute/unmute all Audio elements
-    const audios = document.querySelectorAll('audio'); // We created them dynamically? No, we need to grab them.
-    // Wait, we don't have audio tags, we create new Audio() objects in startTimer? 
-    // Ah, ambient sounds uses <audio> tags? No, the code says:  const audio = document.getElementById(`audio-${soundType}`);
-    // So there ARE audio tags in HTML.
-
-    const allAudios = document.querySelectorAll('audio');
-    let allMuted = true;
-    allAudios.forEach(a => {
-        if (!a.muted) allMuted = false;
-    });
-
-    const newState = !allMuted;
-    allAudios.forEach(a => {
-        a.muted = newState;
-    });
-
-    triggerNotification(newState ? "Muted" : "Unmuted", "All sounds audio toggled.");
-}
-
-// Initial Init
-updateDisplay();
-fetchHistory();
-renderTasks();
-showRandomQuote();
-
+init();

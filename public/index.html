@@ -4,322 +4,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zen52 - Focus & Clarity</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#08090a">
+    <title>Zen52 - Focus Timer</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-    <div class="app-wrapper">
-        <div class="top-controls">
-            <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme">
-                <i class="fa-solid fa-sun"></i>
-            </button>
-            <button id="settings-btn" class="icon-btn" aria-label="Settings">
-                <i class="fa-solid fa-gear"></i>
-            </button>
-            <button id="zen-toggle" class="zen-toggle icon-btn" aria-label="Toggle Zen Mode">
-                <i class="fa-solid fa-expand"></i>
-            </button>
-        </div>
+    <div class="app-shell">
+        <header class="topbar" aria-label="Zen52 controls">
+            <a class="brand" href="/" aria-label="Zen52 home">
+                <span class="brand-mark">52</span>
+                <span>
+                    <strong>Zen52</strong>
+                    <small>Focus timer</small>
+                </span>
+            </a>
+            <div class="top-controls">
+                <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme" title="Theme">
+                    <span aria-hidden="true">☼</span>
+                </button>
+                <button id="settings-btn" class="icon-btn" type="button" aria-label="Open settings" title="Settings">
+                    <span aria-hidden="true">⚙</span>
+                </button>
+                <button id="zen-toggle" class="icon-btn" type="button" aria-label="Toggle zen mode" title="Zen mode">
+                    <span aria-hidden="true">⛶</span>
+                </button>
+            </div>
+        </header>
 
-        <div class="container">
-            <header>
-                <h1>Zen52</h1>
-                <p>52 minutes focus &middot; 17 minutes break</p>
-                <div id="streak-container" class="streak-container hidden" title="Current Focus Streak">
-                    <i class="fa-solid fa-fire"></i> <span id="streak-count">0</span> Day Streak
+        <main class="dashboard">
+            <section class="hero-panel" aria-labelledby="app-title">
+                <div class="hero-copy">
+                    <p class="eyebrow">Deep work rhythm</p>
+                    <h1 id="app-title">52 minutes of focus. 17 minutes to reset.</h1>
+                    <p id="quote-text" class="quote">Focus is the key to productivity.</p>
                 </div>
-                <div id="quote-container" class="quote-container">
-                    <p id="quote-text">"Focus is the key to productivity."</p>
-                </div>
-            </header>
 
-            <main>
-                <div id="daily-goal-container" class="daily-goal-container">
-                    <div class="daily-goal-header">
-                        <span>Daily Goal</span>
-                        <span id="daily-goal-text">0 / 4 hrs</span>
+                <div class="timer-stage" aria-live="polite">
+                    <div class="timer-ring" aria-hidden="true">
+                        <div class="ring-core"></div>
                     </div>
-                    <div class="progress-bar-bg">
-                        <div id="daily-goal-progress" class="progress-bar-fill" style="width: 0%"></div>
-                    </div>
+                    <div id="timer-display" class="timer">52:00</div>
+                    <div id="status-text" class="status-indicator">Focus Mode</div>
                 </div>
 
-                <div id="timer-display" class="timer">52:00</div>
-                <div class="status-indicator" id="status-text">Focus Mode</div>
+                <div class="session-strip">
+                    <div id="daily-goal-container" class="goal-card">
+                        <div class="daily-goal-header">
+                            <span>Daily goal</span>
+                            <span id="daily-goal-text">0 / 4 hrs</span>
+                        </div>
+                        <div class="progress-bar-bg" aria-hidden="true">
+                            <div id="daily-goal-progress" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
 
-                <!-- Pomodoro Cycle Indicator -->
-                <div class="cycle-indicator" id="cycle-indicator">
-                    <span class="cycle-dot active" data-session="1"></span>
-                    <span class="cycle-dot" data-session="2"></span>
-                    <span class="cycle-dot" data-session="3"></span>
-                    <span class="cycle-dot" data-session="4"></span>
-                    <span class="cycle-label" id="cycle-label">Session 1/4</span>
+                    <div id="cycle-indicator" class="cycle-indicator" aria-label="Pomodoro cycle">
+                        <span class="cycle-dot active" data-session="1"></span>
+                        <span class="cycle-dot" data-session="2"></span>
+                        <span class="cycle-dot" data-session="3"></span>
+                        <span class="cycle-dot" data-session="4"></span>
+                        <span id="cycle-label" class="cycle-label">Session 1/4</span>
+                    </div>
+
+                    <div id="streak-container" class="streak-container hidden" title="Current focus streak">
+                        <span aria-hidden="true">↗</span>
+                        <span id="streak-count">0</span> day streak
+                    </div>
                 </div>
 
                 <div class="controls">
-                    <button id="start-btn" class="btn primary">Start Focus</button>
-                    <button id="reset-btn" class="btn secondary" aria-label="Reset Timer"><i
-                            class="fa-solid fa-rotate-right"></i></button>
+                    <button id="start-btn" class="btn primary" type="button">Start Focus</button>
+                    <button id="reset-btn" class="btn secondary icon-action" type="button" aria-label="Reset timer">↻</button>
                 </div>
 
-                <!-- Quick Presets -->
-                <div class="preset-buttons">
-                    <button class="preset-chip" data-focus="25" data-break="5">
-                        <i class="fa-solid fa-tomato"></i> Pomodoro <span class="preset-time">25/5</span>
+                <div class="preset-buttons" aria-label="Timer presets">
+                    <button class="preset-chip" type="button" data-focus="25" data-break="5">
+                        Pomodoro <span class="preset-time">25/5</span>
                     </button>
-                    <button class="preset-chip" data-focus="52" data-break="17">
-                        <i class="fa-solid fa-spa"></i> Zen52 <span class="preset-time">52/17</span>
+                    <button class="preset-chip active" type="button" data-focus="52" data-break="17">
+                        Zen52 <span class="preset-time">52/17</span>
                     </button>
-                    <button class="preset-chip" data-focus="90" data-break="15">
-                        <i class="fa-solid fa-brain"></i> Deep Work <span class="preset-time">90/15</span>
+                    <button class="preset-chip" type="button" data-focus="90" data-break="15">
+                        Deep Work <span class="preset-time">90/15</span>
                     </button>
-                    <button class="preset-chip custom-chip" id="custom-timer-btn">
-                        <i class="fa-solid fa-sliders"></i> Custom
-                    </button>
+                    <button id="custom-timer-btn" class="preset-chip custom-chip" type="button">Custom</button>
                 </div>
 
-                <!-- Custom Timer Quick Input (Hidden by default) -->
                 <div id="custom-timer-input" class="custom-timer-input hidden">
-                    <input type="number" id="quick-focus" placeholder="Focus (min)" min="1" max="180" value="52">
-                    <span>/</span>
-                    <input type="number" id="quick-break" placeholder="Break (min)" min="1" max="60" value="17">
-                    <button class="btn primary small" id="apply-custom-btn">Apply</button>
+                    <label>
+                        <span>Focus</span>
+                        <input type="number" id="quick-focus" min="1" max="180" value="52">
+                    </label>
+                    <label>
+                        <span>Break</span>
+                        <input type="number" id="quick-break" min="1" max="60" value="17">
+                    </label>
+                    <button id="apply-custom-btn" class="btn primary small" type="button">Apply</button>
                 </div>
+            </section>
 
-                <div class="features-grid">
-                    <!-- Ambient Sounds -->
-                    <div class="feature-card sound-card">
-                        <div class="card-header-row"
-                            style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
-                            onclick="this.parentElement.querySelector('.sound-controls').classList.toggle('hidden')">
-                            <h3 style="margin: 0;">Ambience</h3>
-                            <i class="fa-solid fa-chevron-down"
-                                style="font-size: 0.8rem; color: var(--text-secondary);"></i>
-                        </div>
-                        <div class="sound-controls">
-                            <div class="sound-item">
-                                <button class="sound-btn" data-sound="rain" title="Rain">
-                                    <i class="fa-solid fa-cloud-rain"></i>
-                                </button>
-                                <input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.05"
-                                    value="0.5">
-                            </div>
-                            <div class="sound-item">
-                                <button class="sound-btn" data-sound="forest" title="Forest">
-                                    <i class="fa-solid fa-tree"></i>
-                                </button>
-                                <input type="range" class="volume-slider" data-sound="forest" min="0" max="1"
-                                    step="0.05" value="0.5">
-                            </div>
-                            <div class="sound-item">
-                                <button class="sound-btn" data-sound="waves" title="Waves">
-                                    <i class="fa-solid fa-water"></i>
-                                </button>
-                                <input type="range" class="volume-slider" data-sound="waves" min="0" max="1" step="0.05"
-                                    value="0.5">
-                            </div>
-                        </div>
-                        <audio id="audio-rain" loop src="sounds/rain.mp3"></audio>
-                        <audio id="audio-forest" loop src="sounds/forest.mp3"></audio>
-                        <audio id="audio-waves" loop src="sounds/waves.mp3"></audio>
-                    </div>
-
-                    <!-- Task List -->
-                    <div class="feature-card task-card">
-                        <h3>Tasks</h3>
-                        <div class="task-input-group">
-                            <input type="text" id="task-input" placeholder="What are you working on?">
-                            <button id="add-task-btn"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-                        <ul id="task-list" class="task-list">
-                            <!-- Tasks go here -->
-                        </ul>
-                    </div>
-
-                    <!-- Brain Dump -->
-                    <div class="feature-card">
-                        <div class="card-header-row"
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <h3 style="margin: 0;">Brain Dump</h3>
-                            <button id="clear-scratchpad-btn" class="icon-btn small" title="Clear notes"
-                                style="font-size: 0.8rem; color: var(--text-secondary);">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
-                        <textarea id="scratchpad" class="scratchpad" placeholder="Clear your mind..."></textarea>
-                    </div>
-
-                    <!-- Analytics Chart -->
-                    <div class="feature-card chart-card">
-                        <div class="card-header-row"
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <h3 style="margin:0;">Consistency</h3>
-                            <button id="chart-toggle-btn" class="icon-btn small" title="Toggle View"
-                                style="font-size: 0.9rem;">
-                                <i class="fa-solid fa-chart-simple"></i>
-                            </button>
-                        </div>
-
-                        <div id="chart-container" class="chart-container">
-                            <canvas id="weekly-chart"></canvas>
-                        </div>
-
-                        <div id="heatmap-container" class="heatmap-container hidden" style="overflow-x: auto;">
-                            <!-- Heatmap generated by JS -->
-                            <div id="heatmap-grid" class="heatmap-grid"></div>
-                            <div class="heatmap-legend">
-                                <span>Less</span>
-                                <div class="heatmap-cell" data-level="0"></div>
-                                <div class="heatmap-cell" data-level="1"></div>
-                                <div class="heatmap-cell" data-level="2"></div>
-                                <div class="heatmap-cell" data-level="3"></div>
-                                <div class="heatmap-cell" data-level="4"></div>
-                                <span>More</span>
-                            </div>
+            <section class="workspace-grid" aria-label="Focus workspace">
+                <article class="feature-card task-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Now</p>
+                            <h2>Tasks</h2>
                         </div>
                     </div>
+                    <div class="task-input-group">
+                        <input type="text" id="task-input" placeholder="What are you working on?" autocomplete="off">
+                        <button id="add-task-btn" class="icon-btn square" type="button" aria-label="Add task">+</button>
+                    </div>
+                    <ul id="task-list" class="task-list"></ul>
+                </article>
 
-                    <!-- Achievements -->
-                    <div class="feature-card badges-card">
-                        <h3>Achievements</h3>
-                        <div class="badges-grid">
-                            <div class="badge-item locked" id="badge-novice" title="Complete 1 Focus Session">
-                                <div class="badge-icon"><i class="fa-solid fa-seedling"></i></div>
-                                <span>Novice</span>
-                            </div>
-                            <div class="badge-item locked" id="badge-streak" title="Reach a 3-Day Streak">
-                                <div class="badge-icon"><i class="fa-solid fa-fire"></i></div>
-                                <span>Consistent</span>
-                            </div>
-                            <div class="badge-item locked" id="badge-master" title="Accumulate 10 Hours of Focus">
-                                <div class="badge-icon"><i class="fa-solid fa-brain"></i></div>
-                                <span>Zen Master</span>
-                            </div>
+                <article class="feature-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Capture</p>
+                            <h2>Brain dump</h2>
+                        </div>
+                        <button id="clear-scratchpad-btn" class="icon-btn square subtle" type="button" title="Clear notes" aria-label="Clear notes">⌫</button>
+                    </div>
+                    <textarea id="scratchpad" class="scratchpad" placeholder="Clear your mind before the next block."></textarea>
+                </article>
+
+                <article class="feature-card sound-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Sound</p>
+                            <h2>Ambience</h2>
                         </div>
                     </div>
-
-                    <!-- Session History -->
-                    <div class="feature-card history-card">
-                        <h2>Session History</h2>
-                        <ul id="history-list" class="history-list">
-                            <li class="loading-text">Loading history...</li>
-                        </ul>
+                    <div class="sound-controls">
+                        <div class="sound-item">
+                            <button class="sound-btn" type="button" data-sound="rain" title="Rain">Rain</button>
+                            <input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.05" value="0.45" aria-label="Rain volume">
+                        </div>
+                        <div class="sound-item">
+                            <button class="sound-btn" type="button" data-sound="forest" title="Forest">Forest</button>
+                            <input type="range" class="volume-slider" data-sound="forest" min="0" max="1" step="0.05" value="0.35" aria-label="Forest volume">
+                        </div>
+                        <div class="sound-item">
+                            <button class="sound-btn" type="button" data-sound="waves" title="Waves">Waves</button>
+                            <input type="range" class="volume-slider" data-sound="waves" min="0" max="1" step="0.05" value="0.4" aria-label="Waves volume">
+                        </div>
                     </div>
-                </div>
-            </main>
-        </div>
+                </article>
 
-        <!-- Settings Modal -->
-        <dialog id="settings-modal" class="settings-modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Settings</h2>
-                    <button id="close-settings" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <div class="setting-group">
-                    <label for="focus-duration">Focus Duration (minutes)</label>
-                    <input type="number" id="focus-duration" value="52" min="1" max="120">
-                </div>
-                <div class="setting-group">
-                    <label for="break-duration">Break Duration (minutes)</label>
-                    <input type="number" id="break-duration" value="17" min="1" max="60">
-                </div>
+                <article class="feature-card chart-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Review</p>
+                            <h2>Consistency</h2>
+                        </div>
+                        <button id="chart-toggle-btn" class="icon-btn square subtle" type="button" title="Toggle view" aria-label="Toggle chart view">▦</button>
+                    </div>
+                    <div id="chart-container" class="chart-container hidden">
+                        <div id="weekly-chart" class="weekly-chart" aria-label="Weekly focus chart"></div>
+                    </div>
+                    <div id="heatmap-container" class="heatmap-container">
+                        <div id="heatmap-grid" class="heatmap-grid"></div>
+                        <div class="heatmap-legend">
+                            <span>Less</span>
+                            <span class="heatmap-cell" data-level="0"></span>
+                            <span class="heatmap-cell" data-level="1"></span>
+                            <span class="heatmap-cell" data-level="2"></span>
+                            <span class="heatmap-cell" data-level="3"></span>
+                            <span class="heatmap-cell" data-level="4"></span>
+                            <span>More</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="feature-card badges-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Progress</p>
+                            <h2>Achievements</h2>
+                        </div>
+                    </div>
+                    <div class="badges-grid">
+                        <div class="badge-item locked" id="badge-novice" title="Complete 1 focus session">
+                            <div class="badge-icon">01</div>
+                            <span>Novice</span>
+                        </div>
+                        <div class="badge-item locked" id="badge-streak" title="Reach a 3-day streak">
+                            <div class="badge-icon">03</div>
+                            <span>Consistent</span>
+                        </div>
+                        <div class="badge-item locked" id="badge-master" title="Accumulate 10 hours of focus">
+                            <div class="badge-icon">10h</div>
+                            <span>Master</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="feature-card history-card">
+                    <div class="card-header-row">
+                        <div>
+                            <p class="card-kicker">Log</p>
+                            <h2>Session history</h2>
+                        </div>
+                    </div>
+                    <ul id="history-list" class="history-list">
+                        <li class="loading-text">Loading history...</li>
+                    </ul>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <dialog id="settings-modal" class="settings-modal">
+        <form method="dialog" class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="close-settings" class="close-btn" type="button" aria-label="Close settings">×</button>
             </div>
             <div class="setting-group">
-                <label for="daily-goal-input">Daily Goal (hours)</label>
+                <label for="focus-duration">Focus duration</label>
+                <input type="number" id="focus-duration" value="52" min="1" max="180">
+            </div>
+            <div class="setting-group">
+                <label for="break-duration">Break duration</label>
+                <input type="number" id="break-duration" value="17" min="1" max="60">
+            </div>
+            <div class="setting-group">
+                <label for="daily-goal-input">Daily goal in hours</label>
                 <input type="number" id="daily-goal-input" value="4" min="0.5" max="24" step="0.5">
             </div>
-
             <div class="setting-group">
                 <label>Presets</label>
                 <div class="setting-group-row">
-                    <button class="btn secondary small preset-btn" data-focus="25" data-break="5">Pomodoro</button>
-                    <button class="btn secondary small preset-btn" data-focus="52" data-break="17">Zen52</button>
-                    <button class="btn secondary small preset-btn" data-focus="90" data-break="15">Deep Work</button>
+                    <button class="btn secondary small preset-btn" type="button" data-focus="25" data-break="5">Pomodoro</button>
+                    <button class="btn secondary small preset-btn" type="button" data-focus="52" data-break="17">Zen52</button>
+                    <button class="btn secondary small preset-btn" type="button" data-focus="90" data-break="15">Deep Work</button>
                 </div>
             </div>
-
-            <hr class="modal-divider">
-
+            <div class="modal-divider"></div>
             <div class="setting-group-row">
-                <button id="export-data-btn" class="btn secondary small">Export Data <i
-                        class="fa-solid fa-download"></i></button>
-                <button id="import-data-btn" class="btn secondary small">Import Data <i
-                        class="fa-solid fa-upload"></i></button>
-                <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                <button id="export-data-btn" class="btn secondary small" type="button">Export data</button>
+                <button id="import-data-btn" class="btn secondary small" type="button">Import data</button>
+                <input type="file" id="import-file-input" accept=".json" hidden>
             </div>
-
-            <button id="save-settings" class="btn primary full-width">Save Changes</button>
-    </div>
+            <button id="save-settings" class="btn primary full-width" type="button">Save changes</button>
+        </form>
     </dialog>
-    </div>
+
     <dialog id="shortcuts-modal" class="settings-modal">
-        <div class="modal-content">
+        <form method="dialog" class="modal-content">
             <div class="modal-header">
-                <h2>Keyboard Shortcuts</h2>
-                <button class="close-btn" id="close-shortcuts"><i class="fa-solid fa-xmark"></i></button>
+                <h2>Keyboard shortcuts</h2>
+                <button id="close-shortcuts" class="close-btn" type="button" aria-label="Close shortcuts">×</button>
             </div>
             <ul class="shortcut-list">
-                <li class="shortcut-item">
-                    <span>Play / Pause</span> <span class="key-badge">Space</span>
-                </li>
-                <li class="shortcut-item">
-                    <span>Reset Timer</span> <span class="key-badge">R</span>
-                </li>
-                <li class="shortcut-item">
-                    <span>Mute Sounds</span> <span class="key-badge">M</span>
-                </li>
+                <li class="shortcut-item"><span>Play / pause</span><span class="key-badge">Space</span></li>
+                <li class="shortcut-item"><span>Reset timer</span><span class="key-badge">R</span></li>
+                <li class="shortcut-item"><span>Mute ambience</span><span class="key-badge">M</span></li>
             </ul>
-        </div>
+        </form>
     </dialog>
 
-    <!-- Session Notes Modal (appears after focus session) -->
     <dialog id="session-notes-modal" class="settings-modal">
-        <div class="modal-content">
+        <form method="dialog" class="modal-content">
             <div class="modal-header">
-                <h2>🎉 Focus Complete!</h2>
+                <h2>Focus complete</h2>
             </div>
-            <p style="color: var(--text-secondary); margin-bottom: 16px;">What did you accomplish?</p>
-            <textarea id="session-note-input" class="scratchpad" placeholder="I worked on..."
-                style="min-height: 100px; margin-bottom: 16px;"></textarea>
-            <div class="setting-group-row">
-                <button id="skip-note-btn" class="btn secondary">Skip</button>
-                <button id="save-note-btn" class="btn primary">Save Note</button>
+            <p class="modal-copy">What did you accomplish?</p>
+            <textarea id="session-note-input" class="scratchpad compact" placeholder="I worked on..."></textarea>
+            <div class="setting-group-row align-end">
+                <button id="skip-note-btn" class="btn secondary" type="button">Skip</button>
+                <button id="save-note-btn" class="btn primary" type="button">Save note</button>
             </div>
-        </div>
+        </form>
     </dialog>
 
-    <!-- Break Suggestions Modal -->
     <dialog id="break-modal" class="settings-modal">
-        <div class="modal-content" style="text-align: center;">
-            <div class="modal-header" style="justify-content: center;">
-                <h2>🧘 Break Time!</h2>
+        <form method="dialog" class="modal-content centered-modal">
+            <div class="modal-header centered-header">
+                <h2>Break time</h2>
             </div>
-            <p id="break-suggestion" style="font-size: 1.2rem; margin: 20px 0; color: var(--text-primary);">
-                Stand up and stretch!
-            </p>
+            <p id="break-suggestion" class="break-suggestion">Stand up and stretch.</p>
             <div id="breathing-exercise" class="breathing-exercise hidden">
-                <div class="breath-circle" id="breath-circle"></div>
+                <div id="breath-circle" class="breath-circle"></div>
                 <p id="breath-instruction">Breathe in...</p>
             </div>
-            <div class="setting-group-row" style="justify-content: center; gap: 12px;">
-                <button id="start-breathing-btn" class="btn secondary small">
-                    <i class="fa-solid fa-wind"></i> Breathing Exercise
-                </button>
-                <button id="close-break-btn" class="btn primary small">Got it!</button>
+            <div class="setting-group-row align-center">
+                <button id="start-breathing-btn" class="btn secondary small" type="button">Breathing exercise</button>
+                <button id="close-break-btn" class="btn primary small" type="button">Done</button>
             </div>
-        </div>
+        </form>
     </dialog>
 
-    <button id="shortcuts-btn" class="shortcuts-help-btn" title="Shortcuts">?</button>
-
+    <button id="shortcuts-btn" class="shortcuts-help-btn" type="button" title="Shortcuts" aria-label="Keyboard shortcuts">?</button>
     <script src="script.js"></script>
 </body>
 
